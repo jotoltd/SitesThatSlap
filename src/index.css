@@ -1,0 +1,308 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: auto;
+    height: 100%;
+  }
+  
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    overflow-x: hidden;
+    background: #07070f;
+    color: #c5c5e0;
+    height: 100%;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-size: 16px;
+    line-height: 1.7;
+    font-weight: 400;
+  }
+
+  #root {
+    height: 100%;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Orbitron', sans-serif;
+    letter-spacing: 0.02em;
+    line-height: 1.2;
+    font-weight: 700;
+  }
+  
+  p {
+    line-height: 1.75;
+    margin-bottom: 1rem;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-clip-text text-transparent;
+  }
+
+  .gradient-slap {
+    @apply bg-gradient-to-r from-slap-pink via-slap-purple to-slap-cyan;
+  }
+
+  .gradient-fire {
+    @apply bg-gradient-to-r from-slap-yellow via-slap-orange to-slap-pink;
+  }
+
+  .gradient-cool {
+    @apply bg-gradient-to-r from-slap-cyan via-slap-purple to-slap-pink;
+  }
+
+  .glass-neon {
+    background: rgba(10, 10, 30, 0.6);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 0, 110, 0.2);
+  }
+
+  .glow-pink {
+    box-shadow: 0 0 20px rgba(255, 0, 110, 0.7), 0 0 60px rgba(255, 0, 110, 0.4), 0 0 100px rgba(255, 0, 110, 0.2);
+  }
+  .glow-purple {
+    box-shadow: 0 0 20px rgba(131, 56, 236, 0.7), 0 0 60px rgba(131, 56, 236, 0.4), 0 0 100px rgba(131, 56, 236, 0.2);
+  }
+  .glow-cyan {
+    box-shadow: 0 0 20px rgba(58, 134, 255, 0.7), 0 0 60px rgba(58, 134, 255, 0.4), 0 0 100px rgba(58, 134, 255, 0.2);
+  }
+  .glow-green {
+    box-shadow: 0 0 20px rgba(6, 255, 165, 0.7), 0 0 60px rgba(6, 255, 165, 0.4), 0 0 100px rgba(6, 255, 165, 0.2);
+  }
+
+  .neon-border-pink {
+    border: 1px solid #FF006E;
+    box-shadow: 0 0 8px #FF006E, inset 0 0 8px rgba(255, 0, 110, 0.1);
+  }
+  .neon-border-purple {
+    border: 1px solid #8338EC;
+    box-shadow: 0 0 8px #8338EC, inset 0 0 8px rgba(131, 56, 236, 0.1);
+  }
+  .neon-border-cyan {
+    border: 1px solid #3A86FF;
+    box-shadow: 0 0 8px #3A86FF, inset 0 0 8px rgba(58, 134, 255, 0.1);
+  }
+  .neon-border-green {
+    border: 1px solid #06FFA5;
+    box-shadow: 0 0 8px #06FFA5, inset 0 0 8px rgba(6, 255, 165, 0.1);
+  }
+
+  .stroke-text-neon {
+    -webkit-text-stroke: 2px #ff4d9e;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 6px rgba(255,0,110,0.5));
+  }
+}
+
+/* ── Slide Container ─────────────────────────────────────────── */
+.slide-container {
+  height: 100vh;
+  overflow: hidden;
+  position: relative;
+}
+
+.slide {
+  height: 100vh;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* ── Neon Grid Background ────────────────────────────────────── */
+.neon-grid {
+  background-image:
+    linear-gradient(rgba(255, 0, 110, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 0, 110, 0.07) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+/* ── Scanlines ───────────────────────────────────────────────── */
+.scanlines::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.15) 2px,
+    rgba(0, 0, 0, 0.15) 4px
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ── Neon Text Effects ───────────────────────────────────────── */
+.neon-text-pink {
+  color: #ff4d9e;
+  text-shadow: 0 0 8px rgba(255, 0, 110, 0.6), 0 0 20px rgba(255, 0, 110, 0.2);
+}
+
+.neon-text-cyan {
+  color: #6ba8ff;
+  text-shadow: 0 0 8px rgba(58, 134, 255, 0.6), 0 0 20px rgba(58, 134, 255, 0.2);
+}
+
+.neon-text-purple {
+  color: #b07af5;
+  text-shadow: 0 0 8px rgba(131, 56, 236, 0.6), 0 0 20px rgba(131, 56, 236, 0.2);
+}
+
+.neon-text-green {
+  color: #3fffc0;
+  text-shadow: 0 0 8px rgba(6, 255, 165, 0.6), 0 0 20px rgba(6, 255, 165, 0.2);
+}
+
+.neon-text-yellow {
+  color: #ffd04d;
+  text-shadow: 0 0 8px rgba(255, 190, 11, 0.6), 0 0 20px rgba(255, 190, 11, 0.2);
+}
+
+.hero-text-glow {
+  animation: text-glow-cycle 5s ease-in-out infinite alternate;
+}
+
+@keyframes text-glow-cycle {
+  0% {
+    text-shadow: 0 0 12px rgba(255,0,110,0.8), 0 0 30px rgba(255,0,110,0.3);
+    color: #ff4d9e;
+  }
+  50% {
+    text-shadow: 0 0 12px rgba(131,56,236,0.8), 0 0 30px rgba(131,56,236,0.3);
+    color: #b07af5;
+  }
+  100% {
+    text-shadow: 0 0 12px rgba(58,134,255,0.8), 0 0 30px rgba(58,134,255,0.3);
+    color: #6ba8ff;
+  }
+}
+
+/* ── Neon Sign Flicker ───────────────────────────────────────── */
+.neon-sign {
+  color: #fff;
+  text-shadow:
+    0 0 6px rgba(255,255,255,0.8),
+    0 0 20px rgba(255, 0, 110, 0.7),
+    0 0 40px rgba(255, 0, 110, 0.3);
+  animation: neon-flicker 4s infinite alternate;
+}
+
+@keyframes neon-flicker {
+  0%, 18%, 22%, 25%, 54%, 58%, 100% {
+    text-shadow:
+      0 0 6px rgba(255,255,255,0.8),
+      0 0 20px rgba(255, 0, 110, 0.7),
+      0 0 40px rgba(255, 0, 110, 0.3);
+    opacity: 1;
+  }
+  20%, 24%, 56% {
+    text-shadow: none;
+    opacity: 0.85;
+  }
+}
+
+/* ── Pulsing neon orbs ───────────────────────────────────────── */
+.neon-orb-pink {
+  background: radial-gradient(circle, rgba(255,0,110,0.4) 0%, transparent 70%);
+  animation: orb-pulse 4s ease-in-out infinite;
+}
+.neon-orb-purple {
+  background: radial-gradient(circle, rgba(131,56,236,0.4) 0%, transparent 70%);
+  animation: orb-pulse 5s ease-in-out infinite;
+}
+.neon-orb-cyan {
+  background: radial-gradient(circle, rgba(58,134,255,0.4) 0%, transparent 70%);
+  animation: orb-pulse 6s ease-in-out infinite;
+}
+
+@keyframes orb-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.3); opacity: 1; }
+}
+
+/* ── Animated gradient border ────────────────────────────────── */
+.neon-gradient-border {
+  position: relative;
+}
+.neon-gradient-border::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, #FF006E, #8338EC, #3A86FF, #06FFA5);
+  background-size: 300% 300%;
+  animation: gradient-rotate 4s linear infinite;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+}
+
+@keyframes gradient-rotate {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* ── Float animation ─────────────────────────────────────────── */
+@keyframes float-neon {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  33% { transform: translateY(-15px) rotate(2deg); }
+  66% { transform: translateY(8px) rotate(-1deg); }
+}
+
+.float-neon {
+  animation: float-neon 5s ease-in-out infinite;
+}
+
+/* ── Slide dot indicator ─────────────────────────────────────── */
+.slide-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+.slide-dot.active {
+  background: #FF006E;
+  box-shadow: 0 0 10px #FF006E, 0 0 20px rgba(255, 0, 110, 0.5);
+  border-color: #FF006E;
+  transform: scale(1.3);
+}
+
+/* ── Neon input fields ───────────────────────────────────────── */
+.neon-input {
+  background: rgba(10, 10, 30, 0.8);
+  border: 1px solid rgba(255, 0, 110, 0.3);
+  color: #e0e0ff;
+  transition: all 0.3s ease;
+}
+.neon-input:focus {
+  outline: none;
+  border-color: #FF006E;
+  box-shadow: 0 0 10px rgba(255, 0, 110, 0.4), inset 0 0 10px rgba(255, 0, 110, 0.05);
+}
+.neon-input::placeholder {
+  color: rgba(150, 150, 180, 0.6);
+}
+
+/* ── Morph blob ──────────────────────────────────────────────── */
+.morph-blob {
+  animation: morph 10s ease-in-out infinite;
+}
+@keyframes morph {
+  0%, 100% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
+  25% { border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%; }
+  50% { border-radius: 50% 60% 30% 60% / 30% 60% 70% 40%; }
+  75% { border-radius: 60% 40% 60% 30% / 70% 30% 50% 60%; }
+}
