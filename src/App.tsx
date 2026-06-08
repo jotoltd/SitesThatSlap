@@ -4238,8 +4238,9 @@ function App() {
             onWheel={(e) => {
               if (window.innerWidth < 768) return
               if (raffleAnimating.current) return
-              if (e.deltaY > 50) nextRaffle()
-              else if (e.deltaY < -50) prevRaffle()
+              e.preventDefault()
+              if (e.deltaY > 30) nextRaffle()
+              else if (e.deltaY < -30) prevRaffle()
             }}
           >
             {/* Close button */}
@@ -4297,8 +4298,9 @@ function App() {
             onWheel={(e) => {
               if (window.innerWidth < 768) return
               if (bookingAnimating.current) return
-              if (e.deltaY > 50) nextBooking()
-              else if (e.deltaY < -50) prevBooking()
+              e.preventDefault()
+              if (e.deltaY > 30) nextBooking()
+              else if (e.deltaY < -30) prevBooking()
             }}
           >
             {/* Close button */}
@@ -4356,8 +4358,9 @@ function App() {
             onWheel={(e) => {
               if (window.innerWidth < 768) return
               if (restaurantAnimating.current) return
-              if (e.deltaY > 50) nextRestaurant()
-              else if (e.deltaY < -50) prevRestaurant()
+              e.preventDefault()
+              if (e.deltaY > 30) nextRestaurant()
+              else if (e.deltaY < -30) prevRestaurant()
             }}
           >
             {/* Close button */}
@@ -4415,8 +4418,9 @@ function App() {
             onWheel={(e) => {
               if (window.innerWidth < 768) return
               if (realEstateAnimating.current) return
-              if (e.deltaY > 50) nextRealEstate()
-              else if (e.deltaY < -50) prevRealEstate()
+              e.preventDefault()
+              if (e.deltaY > 30) nextRealEstate()
+              else if (e.deltaY < -30) prevRealEstate()
             }}
           >
             {/* Close button */}
@@ -4474,8 +4478,9 @@ function App() {
             onWheel={(e) => {
               if (window.innerWidth < 768) return
               if (elearningAnimating.current) return
-              if (e.deltaY > 50) nextElearning()
-              else if (e.deltaY < -50) prevElearning()
+              e.preventDefault()
+              if (e.deltaY > 30) nextElearning()
+              else if (e.deltaY < -30) prevElearning()
             }}
           >
             <button onClick={closeElearningSlides} className="fixed top-6 right-6 z-[101] w-12 h-12 rounded-full neon-border-yellow flex items-center justify-center hover:scale-110 transition-transform" style={{ background: 'rgba(10,10,30,0.9)' }}>
@@ -4504,8 +4509,9 @@ function App() {
             onWheel={(e) => {
               if (window.innerWidth < 768) return
               if (eventAnimating.current) return
-              if (e.deltaY > 50) nextEvent()
-              else if (e.deltaY < -50) prevEvent()
+              e.preventDefault()
+              if (e.deltaY > 30) nextEvent()
+              else if (e.deltaY < -30) prevEvent()
             }}
 >
             <button onClick={closeEventSlides} className="fixed top-6 right-6 z-[101] w-12 h-12 rounded-full neon-border-orange flex items-center justify-center hover:scale-110 transition-transform" style={{ background: 'rgba(10,10,30,0.9)' }}>
@@ -4534,8 +4540,9 @@ function App() {
             onWheel={(e) => {
               if (window.innerWidth < 768) return
               if (jobAnimating.current) return
-              if (e.deltaY > 50) nextJob()
-              else if (e.deltaY < -50) prevJob()
+              e.preventDefault()
+              if (e.deltaY > 30) nextJob()
+              else if (e.deltaY < -30) prevJob()
             }}
 >
             <button onClick={closeJobSlides} className="fixed top-6 right-6 z-[101] w-12 h-12 rounded-full neon-border-cyan flex items-center justify-center hover:scale-110 transition-transform" style={{ background: 'rgba(10,10,30,0.9)' }}>
@@ -4564,8 +4571,9 @@ function App() {
             onWheel={(e) => {
               if (window.innerWidth < 768) return
               if (vehicleAnimating.current) return
-              if (e.deltaY > 50) nextVehicle()
-              else if (e.deltaY < -50) prevVehicle()
+              e.preventDefault()
+              if (e.deltaY > 30) nextVehicle()
+              else if (e.deltaY < -30) prevVehicle()
             }}
 >
             <button onClick={closeVehicleSlides} className="fixed top-6 right-6 z-[101] w-12 h-12 rounded-full neon-border-purple flex items-center justify-center hover:scale-110 transition-transform" style={{ background: 'rgba(10,10,30,0.9)' }}>
@@ -4594,8 +4602,9 @@ function App() {
             onWheel={(e) => {
               if (window.innerWidth < 768) return
               if (membershipAnimating.current) return
-              if (e.deltaY > 50) nextMembership()
-              else if (e.deltaY < -50) prevMembership()
+              e.preventDefault()
+              if (e.deltaY > 30) nextMembership()
+              else if (e.deltaY < -30) prevMembership()
             }}
 >
             <button onClick={closeMembershipSlides} className="fixed top-6 right-6 z-[101] w-12 h-12 rounded-full neon-border-green flex items-center justify-center hover:scale-110 transition-transform" style={{ background: 'rgba(10,10,30,0.9)' }}>
@@ -4624,8 +4633,9 @@ function App() {
             onWheel={(e) => {
               if (window.innerWidth < 768) return
               if (marketplaceAnimating.current) return
-              if (e.deltaY > 50) nextMarketplace()
-              else if (e.deltaY < -50) prevMarketplace()
+              e.preventDefault()
+              if (e.deltaY > 30) nextMarketplace()
+              else if (e.deltaY < -30) prevMarketplace()
             }}
 >
             <button onClick={closeMarketplaceSlides} className="fixed top-6 right-6 z-[101] w-12 h-12 rounded-full neon-border-pink flex items-center justify-center hover:scale-110 transition-transform" style={{ background: 'rgba(10,10,30,0.9)' }}>
@@ -4654,8 +4664,9 @@ function App() {
             onWheel={(e) => {
               if (window.innerWidth < 768) return
               if (healthcareAnimating.current) return
-              if (e.deltaY > 50) nextHealthcare()
-              else if (e.deltaY < -50) prevHealthcare()
+              e.preventDefault()
+              if (e.deltaY > 30) nextHealthcare()
+              else if (e.deltaY < -30) prevHealthcare()
             }}
 >
             <button onClick={closeHealthcareSlides} className="fixed top-6 right-6 z-[101] w-12 h-12 rounded-full neon-border-cyan flex items-center justify-center hover:scale-110 transition-transform" style={{ background: 'rgba(10,10,30,0.9)' }}>
@@ -4684,8 +4695,9 @@ function App() {
             onWheel={(e) => {
               if (window.innerWidth < 768) return
               if (hotelAnimating.current) return
-              if (e.deltaY > 50) nextHotel()
-              else if (e.deltaY < -50) prevHotel()
+              e.preventDefault()
+              if (e.deltaY > 30) nextHotel()
+              else if (e.deltaY < -30) prevHotel()
             }}
 >
             <button onClick={closeHotelSlides} className="fixed top-6 right-6 z-[101] w-12 h-12 rounded-full neon-border-purple flex items-center justify-center hover:scale-110 transition-transform" style={{ background: 'rgba(10,10,30,0.9)' }}>
@@ -4714,8 +4726,9 @@ function App() {
             onWheel={(e) => {
               if (window.innerWidth < 768) return
               if (fitnessAnimating.current) return
-              if (e.deltaY > 50) nextFitness()
-              else if (e.deltaY < -50) prevFitness()
+              e.preventDefault()
+              if (e.deltaY > 30) nextFitness()
+              else if (e.deltaY < -30) prevFitness()
             }}
 >
             <button onClick={closeFitnessSlides} className="fixed top-6 right-6 z-[101] w-12 h-12 rounded-full neon-border-green flex items-center justify-center hover:scale-110 transition-transform" style={{ background: 'rgba(10,10,30,0.9)' }}>
@@ -4744,8 +4757,9 @@ function App() {
             onWheel={(e) => {
               if (window.innerWidth < 768) return
               if (nonprofitAnimating.current) return
-              if (e.deltaY > 50) nextNonprofit()
-              else if (e.deltaY < -50) prevNonprofit()
+              e.preventDefault()
+              if (e.deltaY > 30) nextNonprofit()
+              else if (e.deltaY < -30) prevNonprofit()
             }}
 >
             <button onClick={closeNonprofitSlides} className="fixed top-6 right-6 z-[101] w-12 h-12 rounded-full neon-border-yellow flex items-center justify-center hover:scale-110 transition-transform" style={{ background: 'rgba(10,10,30,0.9)' }}>
@@ -4774,8 +4788,9 @@ function App() {
             onWheel={(e) => {
               if (window.innerWidth < 768) return
               if (saasAnimating.current) return
-              if (e.deltaY > 50) nextSaas()
-              else if (e.deltaY < -50) prevSaas()
+              e.preventDefault()
+              if (e.deltaY > 30) nextSaas()
+              else if (e.deltaY < -30) prevSaas()
             }}
 >
             <button onClick={closeSaasSlides} className="fixed top-6 right-6 z-[101] w-12 h-12 rounded-full neon-border-orange flex items-center justify-center hover:scale-110 transition-transform" style={{ background: 'rgba(10,10,30,0.9)' }}>
@@ -4804,8 +4819,9 @@ function App() {
             onWheel={(e) => {
               if (window.innerWidth < 768) return
               if (legalAnimating.current) return
-              if (e.deltaY > 50) nextLegal()
-              else if (e.deltaY < -50) prevLegal()
+              e.preventDefault()
+              if (e.deltaY > 30) nextLegal()
+              else if (e.deltaY < -30) prevLegal()
             }}
 >
             <button onClick={closeLegalSlides} className="fixed top-6 right-6 z-[101] w-12 h-12 rounded-full neon-border-cyan flex items-center justify-center hover:scale-110 transition-transform" style={{ background: 'rgba(10,10,30,0.9)' }}>
