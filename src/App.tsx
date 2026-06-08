@@ -223,10 +223,12 @@ function App() {
   const next = useCallback(() => goToSlide(currentSlide + 1), [currentSlide, goToSlide])
   const prev = useCallback(() => goToSlide(currentSlide - 1), [currentSlide, goToSlide])
 
-  // touch
+  // touch - disabled on mobile (<768px) to allow content scrolling
   useEffect(() => {
     const onTouchStart = (e: TouchEvent) => { touchStartY.current = e.touches[0].clientY }
     const onTouchEnd = (e: TouchEvent) => {
+      // Skip on mobile devices - use buttons instead
+      if (window.innerWidth < 768) return
       const delta = touchStartY.current - e.changedTouches[0].clientY
       if (isAnimating.current) return
       if (delta > 50) next()
@@ -4176,6 +4178,16 @@ function App() {
                     {label}
                   </motion.button>
                 ))}
+                <motion.a
+                  href="/login"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.35 }}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="text-lg font-semibold text-slap-cyan hover:text-white text-left py-3 border-b border-white/5 transition-colors flex items-center gap-2"
+                >
+                  Client Login
+                </motion.a>
                 <motion.button
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -4224,6 +4236,7 @@ function App() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onWheel={(e) => {
+              if (window.innerWidth < 768) return // Disable on mobile
               if (raffleAnimating.current) return
               if (e.deltaY > 50) nextRaffle()
               else if (e.deltaY < -50) prevRaffle()
@@ -4282,6 +4295,7 @@ function App() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onWheel={(e) => {
+              if (window.innerWidth < 768) return // Disable on mobile
               if (bookingAnimating.current) return
               if (e.deltaY > 50) nextBooking()
               else if (e.deltaY < -50) prevBooking()
@@ -4340,6 +4354,7 @@ function App() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onWheel={(e) => {
+              if (window.innerWidth < 768) return // Disable on mobile
               if (restaurantAnimating.current) return
               if (e.deltaY > 50) nextRestaurant()
               else if (e.deltaY < -50) prevRestaurant()
@@ -4398,6 +4413,7 @@ function App() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onWheel={(e) => {
+              if (window.innerWidth < 768) return // Disable on mobile
               if (realEstateAnimating.current) return
               if (e.deltaY > 50) nextRealEstate()
               else if (e.deltaY < -50) prevRealEstate()
@@ -4456,6 +4472,7 @@ function App() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onWheel={(e) => {
+              if (window.innerWidth < 768) return // Disable on mobile
               if (elearningAnimating.current) return
               if (e.deltaY > 50) nextElearning()
               else if (e.deltaY < -50) prevElearning()
@@ -4485,6 +4502,7 @@ function App() {
         {eventSlidesOpen && (
           <motion.div className="fixed inset-0 z-[100] bg-[#07070f]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             onWheel={(e) => {
+              if (window.innerWidth < 768) return // Disable on mobile
               if (eventAnimating.current) return
               if (e.deltaY > 50) nextEvent()
               else if (e.deltaY < -50) prevEvent()
@@ -4513,6 +4531,7 @@ function App() {
         {jobSlidesOpen && (
           <motion.div className="fixed inset-0 z-[100] bg-[#07070f]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             onWheel={(e) => {
+              if (window.innerWidth < 768) return // Disable on mobile
               if (jobAnimating.current) return
               if (e.deltaY > 50) nextJob()
               else if (e.deltaY < -50) prevJob()
@@ -4541,6 +4560,7 @@ function App() {
         {vehicleSlidesOpen && (
           <motion.div className="fixed inset-0 z-[100] bg-[#07070f]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             onWheel={(e) => {
+              if (window.innerWidth < 768) return // Disable on mobile
               if (vehicleAnimating.current) return
               if (e.deltaY > 50) nextVehicle()
               else if (e.deltaY < -50) prevVehicle()
@@ -4569,6 +4589,7 @@ function App() {
         {membershipSlidesOpen && (
           <motion.div className="fixed inset-0 z-[100] bg-[#07070f]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             onWheel={(e) => {
+              if (window.innerWidth < 768) return // Disable on mobile
               if (membershipAnimating.current) return
               if (e.deltaY > 50) nextMembership()
               else if (e.deltaY < -50) prevMembership()
@@ -4597,6 +4618,7 @@ function App() {
         {marketplaceSlidesOpen && (
           <motion.div className="fixed inset-0 z-[100] bg-[#07070f]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             onWheel={(e) => {
+              if (window.innerWidth < 768) return // Disable on mobile
               if (marketplaceAnimating.current) return
               if (e.deltaY > 50) nextMarketplace()
               else if (e.deltaY < -50) prevMarketplace()
@@ -4625,6 +4647,7 @@ function App() {
         {healthcareSlidesOpen && (
           <motion.div className="fixed inset-0 z-[100] bg-[#07070f]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             onWheel={(e) => {
+              if (window.innerWidth < 768) return // Disable on mobile
               if (healthcareAnimating.current) return
               if (e.deltaY > 50) nextHealthcare()
               else if (e.deltaY < -50) prevHealthcare()
@@ -4653,6 +4676,7 @@ function App() {
         {hotelSlidesOpen && (
           <motion.div className="fixed inset-0 z-[100] bg-[#07070f]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             onWheel={(e) => {
+              if (window.innerWidth < 768) return // Disable on mobile
               if (hotelAnimating.current) return
               if (e.deltaY > 50) nextHotel()
               else if (e.deltaY < -50) prevHotel()
@@ -4681,6 +4705,7 @@ function App() {
         {fitnessSlidesOpen && (
           <motion.div className="fixed inset-0 z-[100] bg-[#07070f]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             onWheel={(e) => {
+              if (window.innerWidth < 768) return // Disable on mobile
               if (fitnessAnimating.current) return
               if (e.deltaY > 50) nextFitness()
               else if (e.deltaY < -50) prevFitness()
@@ -4709,6 +4734,7 @@ function App() {
         {nonprofitSlidesOpen && (
           <motion.div className="fixed inset-0 z-[100] bg-[#07070f]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             onWheel={(e) => {
+              if (window.innerWidth < 768) return // Disable on mobile
               if (nonprofitAnimating.current) return
               if (e.deltaY > 50) nextNonprofit()
               else if (e.deltaY < -50) prevNonprofit()
@@ -4737,6 +4763,7 @@ function App() {
         {saasSlidesOpen && (
           <motion.div className="fixed inset-0 z-[100] bg-[#07070f]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             onWheel={(e) => {
+              if (window.innerWidth < 768) return // Disable on mobile
               if (saasAnimating.current) return
               if (e.deltaY > 50) nextSaas()
               else if (e.deltaY < -50) prevSaas()
@@ -4765,6 +4792,7 @@ function App() {
         {legalSlidesOpen && (
           <motion.div className="fixed inset-0 z-[100] bg-[#07070f]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             onWheel={(e) => {
+              if (window.innerWidth < 768) return // Disable on mobile
               if (legalAnimating.current) return
               if (e.deltaY > 50) nextLegal()
               else if (e.deltaY < -50) prevLegal()
