@@ -2,13 +2,15 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useAuth } from '../lib/auth'
 import { Lock, Mail, ArrowRight } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const { login } = useAuth()
+  const { login, user } = useAuth()
+  const navigate = useNavigate()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -16,8 +18,12 @@ export default function Login() {
     setIsLoading(true)
     
     try {
-      await login(email, password)
-      window.location.href = '/dashboard'
+      const loggedInUser = await login(email, password)
+      if (loggedInUser?.role === 'admin') {
+        navigate('/admin')
+      } else {
+        navigate('/client')
+      }
     } catch (err) {
       setError('Invalid email or password')
     } finally {

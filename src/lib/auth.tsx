@@ -9,7 +9,7 @@ interface User {
 
 interface AuthContextType {
   user: User | null
-  login: (email: string, password: string) => Promise<void>
+  login: (email: string, password: string) => Promise<User>
   logout: () => void
   isLoading: boolean
 }
@@ -35,7 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(false)
   }, [])
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string): Promise<User> => {
     // Mock auth - replace with Supabase
     const found = MOCK_USERS.find(u => u.email === email && u.password === password)
     if (!found) throw new Error('Invalid credentials')
@@ -43,6 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { password: _, ...userWithoutPassword } = found
     setUser(userWithoutPassword)
     localStorage.setItem('auth_user', JSON.stringify(userWithoutPassword))
+    return userWithoutPassword
   }
 
   const logout = () => {
