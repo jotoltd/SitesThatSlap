@@ -4,7 +4,7 @@ import { useAuth } from '../lib/auth'
 import { 
   Users, FileText, Plus, LogOut, DollarSign, TrendingUp,
   CheckCircle, XCircle, Clock, Send, Trash2, Edit2,
-  ChevronDown, ChevronUp, Search, Filter, Download
+  ChevronDown, ChevronUp, Search, Filter, Download, Menu, X, TrendingUpIcon
 } from 'lucide-react'
 
 // Mock admin data
@@ -33,6 +33,7 @@ export default function AdminDashboard() {
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
   const [expandedInvoice, setExpandedInvoice] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const handleLogout = () => {
     logout()
@@ -62,21 +63,80 @@ export default function AdminDashboard() {
                 <p className="text-xs text-slate-400">{user?.email}</p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <button className="p-2 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold text-sm flex items-center gap-2">
-                <Plus className="w-4 h-4" /> New Invoice
+            <div className="flex items-center gap-2 md:gap-4">
+              <button className="hidden md:flex p-2 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold text-sm items-center gap-2">
+                <Plus className="w-4 h-4" /> <span className="hidden sm:inline">New Invoice</span>
               </button>
               <button onClick={handleLogout} className="p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors">
                 <LogOut className="w-5 h-5" />
               </button>
+              {/* Mobile Hamburger */}
+              <motion.button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="lg:hidden relative w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden"
+                whileTap={{ scale: 0.95 }}
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500" />
+                <div className="absolute inset-[2px] rounded-xl bg-[#0a0a1a]" />
+                <div className="relative z-10">
+                  {mobileMenuOpen ? <X className="w-5 h-5 text-white" /> : <Menu className="w-5 h-5 text-white" />}
+                </div>
+              </motion.button>
             </div>
           </div>
         </div>
       </nav>
 
+      {/* Mobile Menu */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, x: '100%' }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: '100%' }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="fixed top-16 right-0 bottom-0 w-64 z-40 lg:hidden glass-neon border-l border-white/10"
+            style={{ background: 'rgba(10,10,30,0.98)' }}
+          >
+            <div className="p-4 space-y-2">
+              {[
+                { id: 'overview', label: 'Overview', icon: TrendingUp },
+                { id: 'clients', label: 'Clients', icon: Users },
+                { id: 'invoices', label: 'Invoices', icon: FileText },
+                { id: 'projects', label: 'Projects', icon: CheckCircle },
+              ].map((item, i) => (
+                <motion.button
+                  key={item.id}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.1 }}
+                  onClick={() => {
+                    setActiveTab(item.id as any)
+                    setMobileMenuOpen(false)
+                  }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-semibold transition-all ${
+                    activeTab === item.id
+                      ? 'bg-gradient-to-r from-pink-500/20 to-purple-500/20 text-white border border-pink-500/30'
+                      : 'text-slate-400 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <item.icon className="w-5 h-5" />
+                  {item.label}
+                </motion.button>
+              ))}
+              <div className="pt-4 border-t border-white/10">
+                <button className="w-full p-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold flex items-center justify-center gap-2">
+                  <Plus className="w-4 h-4" /> New Invoice
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Sidebar + Content */}
       <div className="pt-16 flex">
-        {/* Sidebar */}
+        {/* Sidebar - Desktop */}
         <aside className="fixed left-0 top-16 bottom-0 w-64 glass-neon border-r border-white/10 hidden lg:block">
           <div className="p-4 space-y-2">
             {[
@@ -102,7 +162,7 @@ export default function AdminDashboard() {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 lg:ml-64 p-6">
+        <main className="flex-1 lg:ml-64 p-4 md:p-6 w-full">
           {/* Overview */}
           {activeTab === 'overview' && (
             <div className="space-y-6">

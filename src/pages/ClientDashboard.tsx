@@ -78,8 +78,8 @@ export default function ClientDashboard() {
           ))}
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-2 mb-6">
+        {/* Tabs - Mobile Scrollable */}
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0">
           {(['projects', 'invoices', 'messages'] as const).map((tab) => (
             <button
               key={tab}
