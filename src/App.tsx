@@ -1192,7 +1192,7 @@ function App() {
           <div className="space-y-5">
             {[
               { Icon: MapPin, label: 'Location', val: 'Leeds, West Yorkshire, UK', sub: 'Working with clients worldwide', cls: 'neon-border-pink' },
-              { Icon: Mail, label: 'Email', val: 'hello@sitesthatslap.co.uk', sub: 'We reply within 24 hours', cls: 'neon-border-cyan' },
+              { Icon: Mail, label: 'Email', val: 'hello@sitesthatslap.com', sub: 'We reply within 24 hours', cls: 'neon-border-cyan' },
               { Icon: Phone, label: 'Phone', val: '07565 871293', sub: 'Mon-Fri, 9am-6pm GMT', cls: 'neon-border-purple', href: 'tel:07565871293' },
               { Icon: MessageCircle, label: 'WhatsApp', val: '07565 871293', sub: 'Message us anytime', cls: 'neon-border-green', href: 'https://wa.me/447565871293' },
             ].map(({ Icon, label, val, sub, cls, href }, i) => (
