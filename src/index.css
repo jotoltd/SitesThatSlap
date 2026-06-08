@@ -306,3 +306,14 @@
   50% { border-radius: 50% 60% 30% 60% / 30% 60% 70% 40%; }
   75% { border-radius: 60% 40% 60% 30% / 70% 30% 50% 60%; }
 }
+
+/* ── Gradient Animation ─────────────────────────────────────── */
+.animate-gradient-x {
+  animation: gradient-x 3s ease infinite;
+  background-size: 200% 200%;
+}
+
+@keyframes gradient-x {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}

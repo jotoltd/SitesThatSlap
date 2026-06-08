@@ -21,6 +21,7 @@ import {
   Shield,
   Calendar,
   X,
+  Menu,
   UtensilsCrossed,
   CreditCard,
   Home,
@@ -137,6 +138,7 @@ function makeVariants(direction: number) {
 // ── Main App ──────────────────────────────────────────────────────────────────
 function App() {
   const [isLoading, setIsLoading] = useState(true)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [currentSlide, setCurrentSlide] = useState(0)
   const [direction, setDirection] = useState(1)
   const [raffleSlidesOpen, setRaffleSlidesOpen] = useState(false)
@@ -4125,9 +4127,69 @@ function App() {
             <button onClick={() => goToSlide(6)} className="px-5 py-2 rounded-full neon-border-pink text-white font-bold text-sm transition-all duration-200">
               Get Started
             </button>
+            <a 
+              href="/login" 
+              className="text-sm font-semibold text-slate-400 hover:text-white transition-colors flex items-center gap-1"
+            >
+              Client Login
+            </a>
           </div>
+
+          {/* Mobile Hamburger - Glowing Gradient */}
+          <motion.button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden relative w-12 h-12 rounded-xl flex items-center justify-center overflow-hidden"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 animate-gradient-x" />
+            <div className="absolute inset-[2px] rounded-xl bg-[#0a0a1a]" />
+            <div className="absolute inset-0 rounded-xl blur-md bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 opacity-50" />
+            <div className="relative z-10">
+              {mobileMenuOpen ? <X className="w-6 h-6 text-white" /> : <Menu className="w-6 h-6 text-white" />}
+            </div>
+          </motion.button>
         </div>
       </nav>
+
+      {/* Mobile Menu Overlay */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+            className="fixed top-16 left-0 right-0 z-40 md:hidden"
+          >
+            <div className="glass-neon border-t border-white/10 mx-4 mt-2 rounded-2xl overflow-hidden" style={{ background: 'rgba(10,10,30,0.95)', backdropFilter: 'blur(20px)' }}>
+              <div className="p-6 flex flex-col gap-4">
+                {([['Services', 2], ['Work', 3], ['About', 4], ['Contact', 6]] as [string, number][]).map(([label, idx], i) => (
+                  <motion.button
+                    key={label}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.1 }}
+                    onClick={() => { goToSlide(idx); setMobileMenuOpen(false); }}
+                    className="text-lg font-semibold text-slate-300 hover:text-white text-left py-3 border-b border-white/5 last:border-0 transition-colors"
+                  >
+                    {label}
+                  </motion.button>
+                ))}
+                <motion.button
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.4 }}
+                  onClick={() => { goToSlide(6); setMobileMenuOpen(false); }}
+                  className="mt-2 px-6 py-4 rounded-xl bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 text-white font-bold text-lg shadow-lg shadow-pink-500/25"
+                >
+                  Get Started
+                </motion.button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Slide dots */}
       {!isLoading && <SlideDots current={currentSlide} onGo={goToSlide} />}
