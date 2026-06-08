@@ -4182,9 +4182,9 @@ function App() {
                   href="/login"
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.35 }}
+                  transition={{ delay: 0.4 }}
                   onClick={() => setMobileMenuOpen(false)}
-                  className="text-lg font-semibold text-slap-cyan hover:text-white text-left py-3 border-b border-white/5 transition-colors flex items-center gap-2"
+                  className="text-lg font-semibold text-cyan-400 hover:text-cyan-300 text-left py-3 border-b border-white/5 last:border-0 transition-colors"
                 >
                   Client Login
                 </motion.a>

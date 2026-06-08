@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { useAuth } from '../lib/auth'
 import { 
   FileText, CreditCard, MessageSquare, CheckCircle2, 
-  Clock, Download, LogOut, User, ChevronRight, Star
+  Clock, Download, LogOut, User
 } from 'lucide-react'
 
 // Mock data - replace with Supabase

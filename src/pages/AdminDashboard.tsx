@@ -4,7 +4,7 @@ import { useAuth } from '../lib/auth'
 import { 
   Users, FileText, Plus, LogOut, DollarSign, TrendingUp,
   CheckCircle, XCircle, Clock, Send, Trash2, Edit2,
-  ChevronDown, ChevronUp, Search, Filter, Download, Menu, X, TrendingUpIcon
+  Search, Filter, Download, Menu, X
 } from 'lucide-react'
 
 // Mock admin data
@@ -30,8 +30,6 @@ const MOCK_PROJECTS = [
 export default function AdminDashboard() {
   const { user, logout } = useAuth()
   const [activeTab, setActiveTab] = useState<'overview' | 'clients' | 'invoices' | 'projects'>('overview')
-  const [showInvoiceModal, setShowInvoiceModal] = useState(false)
-  const [expandedInvoice, setExpandedInvoice] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
@@ -240,7 +238,6 @@ export default function AdminDashboard() {
               <div className="flex items-center justify-between">
                 <h1 className="text-3xl font-black text-white">Invoices</h1>
                 <button 
-                  onClick={() => setShowInvoiceModal(true)}
                   className="px-6 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold flex items-center gap-2"
                 >
                   <Plus className="w-5 h-5" /> Create Invoice
