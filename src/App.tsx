@@ -4235,6 +4235,12 @@ function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            onWheel={(e) => {
+              if (window.innerWidth < 768) return
+              if (raffleAnimating.current) return
+              if (e.deltaY > 50) nextRaffle()
+              else if (e.deltaY < -50) prevRaffle()
+            }}
           >
             {/* Close button */}
             <button
@@ -4288,6 +4294,12 @@ function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            onWheel={(e) => {
+              if (window.innerWidth < 768) return
+              if (bookingAnimating.current) return
+              if (e.deltaY > 50) nextBooking()
+              else if (e.deltaY < -50) prevBooking()
+            }}
           >
             {/* Close button */}
             <button
@@ -4341,6 +4353,12 @@ function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            onWheel={(e) => {
+              if (window.innerWidth < 768) return
+              if (restaurantAnimating.current) return
+              if (e.deltaY > 50) nextRestaurant()
+              else if (e.deltaY < -50) prevRestaurant()
+            }}
           >
             {/* Close button */}
             <button
@@ -4394,6 +4412,12 @@ function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            onWheel={(e) => {
+              if (window.innerWidth < 768) return
+              if (realEstateAnimating.current) return
+              if (e.deltaY > 50) nextRealEstate()
+              else if (e.deltaY < -50) prevRealEstate()
+            }}
           >
             {/* Close button */}
             <button
@@ -4447,6 +4471,12 @@ function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            onWheel={(e) => {
+              if (window.innerWidth < 768) return
+              if (elearningAnimating.current) return
+              if (e.deltaY > 50) nextElearning()
+              else if (e.deltaY < -50) prevElearning()
+            }}
           >
             <button onClick={closeElearningSlides} className="fixed top-6 right-6 z-[101] w-12 h-12 rounded-full neon-border-yellow flex items-center justify-center hover:scale-110 transition-transform" style={{ background: 'rgba(10,10,30,0.9)' }}>
               <X className="w-6 h-6 text-white" />
@@ -4471,6 +4501,12 @@ function App() {
       <AnimatePresence>
         {eventSlidesOpen && (
           <motion.div className="fixed inset-0 z-[100] bg-[#07070f]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onWheel={(e) => {
+              if (window.innerWidth < 768) return
+              if (eventAnimating.current) return
+              if (e.deltaY > 50) nextEvent()
+              else if (e.deltaY < -50) prevEvent()
+            }}
 >
             <button onClick={closeEventSlides} className="fixed top-6 right-6 z-[101] w-12 h-12 rounded-full neon-border-orange flex items-center justify-center hover:scale-110 transition-transform" style={{ background: 'rgba(10,10,30,0.9)' }}>
               <X className="w-6 h-6 text-white" />
@@ -4495,6 +4531,12 @@ function App() {
       <AnimatePresence>
         {jobSlidesOpen && (
           <motion.div className="fixed inset-0 z-[100] bg-[#07070f]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onWheel={(e) => {
+              if (window.innerWidth < 768) return
+              if (jobAnimating.current) return
+              if (e.deltaY > 50) nextJob()
+              else if (e.deltaY < -50) prevJob()
+            }}
 >
             <button onClick={closeJobSlides} className="fixed top-6 right-6 z-[101] w-12 h-12 rounded-full neon-border-cyan flex items-center justify-center hover:scale-110 transition-transform" style={{ background: 'rgba(10,10,30,0.9)' }}>
               <X className="w-6 h-6 text-white" />
@@ -4519,6 +4561,12 @@ function App() {
       <AnimatePresence>
         {vehicleSlidesOpen && (
           <motion.div className="fixed inset-0 z-[100] bg-[#07070f]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onWheel={(e) => {
+              if (window.innerWidth < 768) return
+              if (vehicleAnimating.current) return
+              if (e.deltaY > 50) nextVehicle()
+              else if (e.deltaY < -50) prevVehicle()
+            }}
 >
             <button onClick={closeVehicleSlides} className="fixed top-6 right-6 z-[101] w-12 h-12 rounded-full neon-border-purple flex items-center justify-center hover:scale-110 transition-transform" style={{ background: 'rgba(10,10,30,0.9)' }}>
               <X className="w-6 h-6 text-white" />
@@ -4543,6 +4591,12 @@ function App() {
       <AnimatePresence>
         {membershipSlidesOpen && (
           <motion.div className="fixed inset-0 z-[100] bg-[#07070f]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onWheel={(e) => {
+              if (window.innerWidth < 768) return
+              if (membershipAnimating.current) return
+              if (e.deltaY > 50) nextMembership()
+              else if (e.deltaY < -50) prevMembership()
+            }}
 >
             <button onClick={closeMembershipSlides} className="fixed top-6 right-6 z-[101] w-12 h-12 rounded-full neon-border-green flex items-center justify-center hover:scale-110 transition-transform" style={{ background: 'rgba(10,10,30,0.9)' }}>
               <X className="w-6 h-6 text-white" />
@@ -4567,6 +4621,12 @@ function App() {
       <AnimatePresence>
         {marketplaceSlidesOpen && (
           <motion.div className="fixed inset-0 z-[100] bg-[#07070f]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onWheel={(e) => {
+              if (window.innerWidth < 768) return
+              if (marketplaceAnimating.current) return
+              if (e.deltaY > 50) nextMarketplace()
+              else if (e.deltaY < -50) prevMarketplace()
+            }}
 >
             <button onClick={closeMarketplaceSlides} className="fixed top-6 right-6 z-[101] w-12 h-12 rounded-full neon-border-pink flex items-center justify-center hover:scale-110 transition-transform" style={{ background: 'rgba(10,10,30,0.9)' }}>
               <X className="w-6 h-6 text-white" />
@@ -4591,6 +4651,12 @@ function App() {
       <AnimatePresence>
         {healthcareSlidesOpen && (
           <motion.div className="fixed inset-0 z-[100] bg-[#07070f]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onWheel={(e) => {
+              if (window.innerWidth < 768) return
+              if (healthcareAnimating.current) return
+              if (e.deltaY > 50) nextHealthcare()
+              else if (e.deltaY < -50) prevHealthcare()
+            }}
 >
             <button onClick={closeHealthcareSlides} className="fixed top-6 right-6 z-[101] w-12 h-12 rounded-full neon-border-cyan flex items-center justify-center hover:scale-110 transition-transform" style={{ background: 'rgba(10,10,30,0.9)' }}>
               <X className="w-6 h-6 text-white" />
@@ -4615,6 +4681,12 @@ function App() {
       <AnimatePresence>
         {hotelSlidesOpen && (
           <motion.div className="fixed inset-0 z-[100] bg-[#07070f]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onWheel={(e) => {
+              if (window.innerWidth < 768) return
+              if (hotelAnimating.current) return
+              if (e.deltaY > 50) nextHotel()
+              else if (e.deltaY < -50) prevHotel()
+            }}
 >
             <button onClick={closeHotelSlides} className="fixed top-6 right-6 z-[101] w-12 h-12 rounded-full neon-border-purple flex items-center justify-center hover:scale-110 transition-transform" style={{ background: 'rgba(10,10,30,0.9)' }}>
               <X className="w-6 h-6 text-white" />
@@ -4639,6 +4711,12 @@ function App() {
       <AnimatePresence>
         {fitnessSlidesOpen && (
           <motion.div className="fixed inset-0 z-[100] bg-[#07070f]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onWheel={(e) => {
+              if (window.innerWidth < 768) return
+              if (fitnessAnimating.current) return
+              if (e.deltaY > 50) nextFitness()
+              else if (e.deltaY < -50) prevFitness()
+            }}
 >
             <button onClick={closeFitnessSlides} className="fixed top-6 right-6 z-[101] w-12 h-12 rounded-full neon-border-green flex items-center justify-center hover:scale-110 transition-transform" style={{ background: 'rgba(10,10,30,0.9)' }}>
               <X className="w-6 h-6 text-white" />
@@ -4663,6 +4741,12 @@ function App() {
       <AnimatePresence>
         {nonprofitSlidesOpen && (
           <motion.div className="fixed inset-0 z-[100] bg-[#07070f]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onWheel={(e) => {
+              if (window.innerWidth < 768) return
+              if (nonprofitAnimating.current) return
+              if (e.deltaY > 50) nextNonprofit()
+              else if (e.deltaY < -50) prevNonprofit()
+            }}
 >
             <button onClick={closeNonprofitSlides} className="fixed top-6 right-6 z-[101] w-12 h-12 rounded-full neon-border-yellow flex items-center justify-center hover:scale-110 transition-transform" style={{ background: 'rgba(10,10,30,0.9)' }}>
               <X className="w-6 h-6 text-white" />
@@ -4687,6 +4771,12 @@ function App() {
       <AnimatePresence>
         {saasSlidesOpen && (
           <motion.div className="fixed inset-0 z-[100] bg-[#07070f]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onWheel={(e) => {
+              if (window.innerWidth < 768) return
+              if (saasAnimating.current) return
+              if (e.deltaY > 50) nextSaas()
+              else if (e.deltaY < -50) prevSaas()
+            }}
 >
             <button onClick={closeSaasSlides} className="fixed top-6 right-6 z-[101] w-12 h-12 rounded-full neon-border-orange flex items-center justify-center hover:scale-110 transition-transform" style={{ background: 'rgba(10,10,30,0.9)' }}>
               <X className="w-6 h-6 text-white" />
@@ -4711,6 +4801,12 @@ function App() {
       <AnimatePresence>
         {legalSlidesOpen && (
           <motion.div className="fixed inset-0 z-[100] bg-[#07070f]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onWheel={(e) => {
+              if (window.innerWidth < 768) return
+              if (legalAnimating.current) return
+              if (e.deltaY > 50) nextLegal()
+              else if (e.deltaY < -50) prevLegal()
+            }}
 >
             <button onClick={closeLegalSlides} className="fixed top-6 right-6 z-[101] w-12 h-12 rounded-full neon-border-cyan flex items-center justify-center hover:scale-110 transition-transform" style={{ background: 'rgba(10,10,30,0.9)' }}>
               <X className="w-6 h-6 text-white" />
