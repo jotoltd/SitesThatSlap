@@ -6,6 +6,7 @@ import App from './App.tsx'
 import Login from './pages/Login.tsx'
 import ClientDashboard from './pages/ClientDashboard.tsx'
 import AdminDashboard from './pages/AdminDashboard.tsx'
+import ProtectedRoute from './components/ProtectedRoute.tsx'
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -15,8 +16,16 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Routes>
           <Route path="/" element={<App />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/client" element={<ClientDashboard />} />
-          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/client" element={
+            <ProtectedRoute allowedRole="client">
+              <ClientDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin" element={
+            <ProtectedRoute allowedRole="admin">
+              <AdminDashboard />
+            </ProtectedRoute>
+          } />
         </Routes>
       </AuthProvider>
     </BrowserRouter>
