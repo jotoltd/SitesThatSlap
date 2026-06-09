@@ -775,21 +775,35 @@ export default function AdminDashboard() {
       }
 
       // Wait for trigger to create profile, then update with additional fields
-      await new Promise(resolve => setTimeout(resolve, 800))
+      // Retry a few times if profile doesn't exist yet
+      let profileUpdated = false
+      let retries = 0
+      const maxRetries = 5
       
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({
-          phone: phone || null,
-          address: address || null,
-          company_name: company_name || null,
-          website: website || null,
-          notes: notes || null
-        })
-        .eq('id', authData.user.id)
+      while (!profileUpdated && retries < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, 500))
+        
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({
+            phone: phone || null,
+            address: address || null,
+            company_name: company_name || null,
+            website: website || null,
+            notes: notes || null
+          })
+          .eq('id', authData.user.id)
 
-      if (updateError) {
-        console.error('Error updating profile:', updateError)
+        if (!updateError) {
+          profileUpdated = true
+        } else {
+          console.log(`Profile update attempt ${retries + 1} failed, retrying...`, updateError)
+          retries++
+        }
+      }
+      
+      if (!profileUpdated) {
+        console.error('Failed to update profile after all retries')
       }
 
       // Show success message
