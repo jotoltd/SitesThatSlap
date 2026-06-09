@@ -328,8 +328,17 @@ export default function AdminDashboard() {
     const notes = formData.get('notes') as string
 
     try {
+      // Save admin's current session before creating client
+      // signUp() will switch session to the new user, so we need to restore it
+      const { data: { session: adminSession } } = await supabase.auth.getSession()
+      
+      if (!adminSession) {
+        alert('Error: Admin session not found. Please login again.')
+        setCreatingClient(false)
+        return
+      }
+
       // Create auth user - profile will be created by trigger
-      // Note: If email confirmation is enabled in Supabase, user will need to confirm email before login
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -343,13 +352,36 @@ export default function AdminDashboard() {
       })
 
       if (authError) {
+        // Restore admin session on error
+        await supabase.auth.setSession({
+          access_token: adminSession.access_token,
+          refresh_token: adminSession.refresh_token
+        })
         alert('Error creating client: ' + authError.message)
         setCreatingClient(false)
         return
       }
 
       if (!authData.user) {
+        // Restore admin session on error
+        await supabase.auth.setSession({
+          access_token: adminSession.access_token,
+          refresh_token: adminSession.refresh_token
+        })
         alert('Error: No user returned from signup')
+        setCreatingClient(false)
+        return
+      }
+
+      // Restore admin's session immediately after creating client
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: adminSession.access_token,
+        refresh_token: adminSession.refresh_token
+      })
+
+      if (sessionError) {
+        console.error('Error restoring admin session:', sessionError)
+        alert('Client created but session error occurred. Please refresh the page.')
         setCreatingClient(false)
         return
       }
