@@ -217,9 +217,9 @@ export default function AdminDashboard() {
     doc.rect(0, 0, 210, 40, 'F')
     doc.setTextColor(255, 255, 255)
     doc.setFontSize(24)
-    doc.text('Joto Ltd', 20, 25)
+    doc.text('Sites That Slap', 20, 25)
     doc.setFontSize(12)
-    doc.text('Sites That Slap', 20, 32)
+    doc.text('Joto Ltd', 20, 32)
     
     // Invoice Title
     doc.setTextColor(255, 0, 110)
@@ -262,7 +262,7 @@ export default function AdminDashboard() {
     doc.setTextColor(100, 100, 100)
     doc.setFontSize(10)
     doc.text('Thank you for your business!', 20, 260)
-    doc.text('Joto Ltd - info@jotoltd.com', 20, 267)
+    doc.text('Sites That Slap - info@sitesthatslap.com', 20, 267)
     
     doc.save(`${invoice.invoice_number}.pdf`)
   }
@@ -390,7 +390,7 @@ export default function AdminDashboard() {
                 <span className="text-white font-black text-lg">J</span>
               </div>
               <div>
-                <p className="text-white font-bold">Joto Admin</p>
+                <p className="text-white font-bold">Sites That Slap Admin</p>
                 <p className="text-xs text-slate-400">{user?.email}</p>
               </div>
             </div>

@@ -109,9 +109,9 @@ export default function ClientDashboard() {
     doc.rect(0, 0, 210, 40, 'F')
     doc.setTextColor(255, 255, 255)
     doc.setFontSize(24)
-    doc.text('Joto Ltd', 20, 25)
+    doc.text('Sites That Slap', 20, 25)
     doc.setFontSize(12)
-    doc.text('Sites That Slap', 20, 32)
+    doc.text('Joto Ltd', 20, 32)
     
     // Invoice Title
     doc.setTextColor(255, 0, 110)
@@ -155,7 +155,7 @@ export default function ClientDashboard() {
     doc.setTextColor(100, 100, 100)
     doc.setFontSize(10)
     doc.text('Thank you for your business!', 20, 260)
-    doc.text('Joto Ltd - info@jotoltd.com', 20, 267)
+    doc.text('Sites That Slap - info@sitesthatslap.com', 20, 267)
     
     doc.save(`${invoice.invoice_number}.pdf`)
   }
