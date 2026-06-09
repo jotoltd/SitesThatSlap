@@ -19,6 +19,11 @@ interface Client {
   email: string
   role: string
   created_at: string
+  phone?: string
+  address?: string
+  company_name?: string
+  website?: string
+  notes?: string
 }
 
 interface Invoice {
@@ -316,9 +321,14 @@ export default function AdminDashboard() {
     const email = formData.get('email') as string
     const password = formData.get('password') as string
     const name = formData.get('name') as string
+    const phone = formData.get('phone') as string
+    const address = formData.get('address') as string
+    const company_name = formData.get('company_name') as string
+    const website = formData.get('website') as string
+    const notes = formData.get('notes') as string
 
     // Create auth user - profile will be created by trigger
-    const { error } = await supabase.auth.signUp({
+    const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -329,12 +339,34 @@ export default function AdminDashboard() {
       }
     })
 
-    if (error) {
-      alert('Error creating client: ' + error.message)
-    } else {
-      setShowClientModal(false)
-      fetchData()
+    if (authError) {
+      alert('Error creating client: ' + authError.message)
+      setCreatingClient(false)
+      return
     }
+
+    // Wait a moment for trigger to create profile, then update with additional fields
+    if (authData.user) {
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          phone: phone || null,
+          address: address || null,
+          company_name: company_name || null,
+          website: website || null,
+          notes: notes || null
+        })
+        .eq('id', authData.user.id)
+
+      if (updateError) {
+        console.error('Error updating profile:', updateError)
+      }
+    }
+
+    setShowClientModal(false)
+    fetchData()
     setCreatingClient(false)
   }
 
@@ -853,9 +885,44 @@ export default function AdminDashboard() {
                         <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 flex items-center justify-center text-white font-bold text-xl">
                           {client.name.charAt(0)}
                         </div>
+                        <span className="text-xs text-slate-500">
+                          {new Date(client.created_at).toLocaleDateString()}
+                        </span>
                       </div>
+                      
                       <h3 className="font-bold text-white text-lg">{client.name}</h3>
-                      <p className="text-slate-500 text-xs mt-1">{client.email}</p>
+                      {client.company_name && (
+                        <p className="text-slap-pink text-sm font-medium">{client.company_name}</p>
+                      )}
+                      <p className="text-slate-400 text-sm mt-1">{client.email}</p>
+                      
+                      {/* Additional Info */}
+                      <div className="mt-4 space-y-2 pt-4 border-t border-white/10">
+                        {client.phone && (
+                          <p className="text-slate-400 text-xs flex items-center gap-2">
+                            <span className="text-slate-500">Phone:</span> {client.phone}
+                          </p>
+                        )}
+                        {client.address && (
+                          <p className="text-slate-400 text-xs flex items-start gap-2">
+                            <span className="text-slate-500">Address:</span> 
+                            <span className="line-clamp-2">{client.address}</span>
+                          </p>
+                        )}
+                        {client.website && (
+                          <p className="text-slate-400 text-xs">
+                            <span className="text-slate-500">Website:</span>{' '}
+                            <a href={client.website} target="_blank" rel="noopener noreferrer" className="text-slap-cyan hover:underline">
+                              {client.website.replace(/^https?:\/\//, '')}
+                            </a>
+                          </p>
+                        )}
+                        {client.notes && (
+                          <p className="text-slate-500 text-xs italic mt-2 line-clamp-2">
+                            "{client.notes}"
+                          </p>
+                        )}
+                      </div>
                     </motion.div>
                   ))}
                 </div>
@@ -1292,18 +1359,52 @@ export default function AdminDashboard() {
             >
               <h2 className="text-2xl font-black text-white mb-6">Create Client</h2>
               <form onSubmit={handleCreateClient} className="space-y-4">
-                <div>
-                  <label className="block text-slate-400 text-sm mb-2">Name</label>
-                  <input name="name" type="text" required className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" placeholder="Client name" />
+                {/* Required Fields */}
+                <div className="border-b border-white/10 pb-4">
+                  <p className="text-slate-400 text-xs uppercase tracking-wider mb-3">Required</p>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-slate-400 text-sm mb-2">Name *</label>
+                      <input name="name" type="text" required className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" placeholder="Client name" />
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 text-sm mb-2">Email *</label>
+                      <input name="email" type="email" required className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" placeholder="client@example.com" />
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 text-sm mb-2">Password *</label>
+                      <input name="password" type="password" required minLength={6} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" placeholder="Min 6 characters" />
+                    </div>
+                  </div>
                 </div>
+
+                {/* Optional Fields */}
                 <div>
-                  <label className="block text-slate-400 text-sm mb-2">Email</label>
-                  <input name="email" type="email" required className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" placeholder="client@example.com" />
+                  <p className="text-slate-400 text-xs uppercase tracking-wider mb-3">Additional Info (Optional)</p>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-slate-400 text-sm mb-2">Company Name</label>
+                      <input name="company_name" type="text" className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" placeholder="Company Ltd" />
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 text-sm mb-2">Phone</label>
+                      <input name="phone" type="tel" className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" placeholder="+44 123 456 7890" />
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 text-sm mb-2">Address</label>
+                      <textarea name="address" rows={2} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white resize-none" placeholder="123 Street, City, Postcode" />
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 text-sm mb-2">Website</label>
+                      <input name="website" type="url" className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" placeholder="https://example.com" />
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 text-sm mb-2">Notes</label>
+                      <textarea name="notes" rows={2} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white resize-none" placeholder="Any additional notes..." />
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-slate-400 text-sm mb-2">Password</label>
-                  <input name="password" type="password" required minLength={6} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" placeholder="Min 6 characters" />
-                </div>
+
                 <div className="flex gap-4 pt-4">
                   <button type="button" onClick={() => setShowClientModal(false)} className="flex-1 px-4 py-3 rounded-xl bg-white/5 text-white font-bold hover:bg-white/10">
                     Cancel
