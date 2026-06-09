@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
+import { jsPDF } from 'jspdf'
 import { 
   FileText, CreditCard, MessageSquare, CheckCircle2, 
   Clock, Download, LogOut, User, Loader2, Send
@@ -47,6 +48,23 @@ export default function ClientDashboard() {
   useEffect(() => {
     if (user) {
       fetchData()
+
+      // Real-time subscriptions
+      const channels = [
+        supabase.channel('client-projects-changes')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'projects', filter: `client_id=eq.${user.id}` }, fetchData)
+          .subscribe(),
+        supabase.channel('client-invoices-changes')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices', filter: `client_id=eq.${user.id}` }, fetchData)
+          .subscribe(),
+        supabase.channel('client-messages-changes')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `client_id=eq.${user.id}` }, fetchData)
+          .subscribe()
+      ]
+
+      return () => {
+        channels.forEach(channel => supabase.removeChannel(channel))
+      }
     }
   }, [user])
 
@@ -84,29 +102,62 @@ export default function ClientDashboard() {
   }
 
   const handleDownloadInvoice = (invoice: Invoice) => {
-    // Generate simple PDF-like text and download
-    const content = `
-INVOICE
-=======
-Invoice #: ${invoice.invoice_number}
-Date: ${invoice.date}
-Due Date: ${invoice.due_date}
-Status: ${invoice.status.toUpperCase()}
-
-Amount: £${invoice.amount.toLocaleString()}
-
-Thank you for your business!
-    `.trim()
+    const doc = new jsPDF()
     
-    const blob = new Blob([content], { type: 'text/plain' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${invoice.invoice_number}.txt`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+    // Header
+    doc.setFillColor(255, 0, 110)
+    doc.rect(0, 0, 210, 40, 'F')
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(24)
+    doc.text('Joto Ltd', 20, 25)
+    doc.setFontSize(12)
+    doc.text('Sites That Slap', 20, 32)
+    
+    // Invoice Title
+    doc.setTextColor(255, 0, 110)
+    doc.setFontSize(28)
+    doc.text('INVOICE', 140, 25)
+    
+    // Invoice Details
+    doc.setTextColor(100, 100, 100)
+    doc.setFontSize(10)
+    doc.text(`Invoice #: ${invoice.invoice_number}`, 140, 32)
+    doc.text(`Date: ${invoice.date}`, 140, 37)
+    
+    // Bill To
+    doc.setTextColor(0, 0, 0)
+    doc.setFontSize(14)
+    doc.text('Bill To:', 20, 60)
+    doc.setFontSize(12)
+    doc.setTextColor(100, 100, 100)
+    doc.text(user?.name || 'Client', 20, 68)
+    doc.text(user?.email || '', 20, 75)
+    
+    // Amount Box
+    doc.setFillColor(248, 249, 250)
+    doc.roundedRect(120, 55, 70, 35, 3, 3, 'F')
+    doc.setTextColor(100, 100, 100)
+    doc.setFontSize(10)
+    doc.text('Amount Due', 130, 68)
+    doc.setTextColor(255, 0, 110)
+    doc.setFontSize(20)
+    doc.text(`£${invoice.amount.toLocaleString()}`, 130, 80)
+    
+    // Status
+    doc.setFontSize(10)
+    doc.setTextColor(100, 100, 100)
+    doc.text(`Status: ${invoice.status.toUpperCase()}`, 20, 100)
+    doc.text(`Due Date: ${invoice.due_date}`, 20, 107)
+    
+    // Footer
+    doc.setDrawColor(255, 0, 110)
+    doc.line(20, 250, 190, 250)
+    doc.setTextColor(100, 100, 100)
+    doc.setFontSize(10)
+    doc.text('Thank you for your business!', 20, 260)
+    doc.text('Joto Ltd - info@jotoltd.com', 20, 267)
+    
+    doc.save(`${invoice.invoice_number}.pdf`)
   }
 
   const handleLogout = () => {

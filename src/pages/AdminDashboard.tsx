@@ -2,6 +2,11 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
+import { jsPDF } from 'jspdf'
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
+  PieChart, Pie, Cell 
+} from 'recharts'
 import { 
   Users, FileText, Plus, LogOut, DollarSign, TrendingUp,
   CheckCircle, XCircle, Clock, Send, Trash2, Edit2,
@@ -79,6 +84,26 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchData()
+
+    // Real-time subscriptions
+    const channels = [
+      supabase.channel('invoices-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, fetchData)
+        .subscribe(),
+      supabase.channel('projects-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, fetchData)
+        .subscribe(),
+      supabase.channel('messages-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, fetchData)
+        .subscribe(),
+      supabase.channel('clients-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, fetchData)
+        .subscribe()
+    ]
+
+    return () => {
+      channels.forEach(channel => supabase.removeChannel(channel))
+    }
   }, [])
 
   const fetchData = async () => {
@@ -182,6 +207,64 @@ export default function AdminDashboard() {
     if (!confirm('Delete this invoice?')) return
     await supabase.from('invoices').delete().eq('id', id)
     fetchData()
+  }
+
+  const handleDownloadInvoice = (invoice: Invoice, clientName: string) => {
+    const doc = new jsPDF()
+    
+    // Header
+    doc.setFillColor(255, 0, 110)
+    doc.rect(0, 0, 210, 40, 'F')
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(24)
+    doc.text('Joto Ltd', 20, 25)
+    doc.setFontSize(12)
+    doc.text('Sites That Slap', 20, 32)
+    
+    // Invoice Title
+    doc.setTextColor(255, 0, 110)
+    doc.setFontSize(28)
+    doc.text('INVOICE', 140, 25)
+    
+    // Invoice Details
+    doc.setTextColor(100, 100, 100)
+    doc.setFontSize(10)
+    doc.text(`Invoice #: ${invoice.invoice_number}`, 140, 32)
+    doc.text(`Date: ${invoice.date}`, 140, 37)
+    
+    // Bill To
+    doc.setTextColor(0, 0, 0)
+    doc.setFontSize(14)
+    doc.text('Bill To:', 20, 60)
+    doc.setFontSize(12)
+    doc.setTextColor(100, 100, 100)
+    doc.text(clientName || 'Client', 20, 68)
+    
+    // Amount Box
+    doc.setFillColor(248, 249, 250)
+    doc.roundedRect(120, 55, 70, 35, 3, 3, 'F')
+    doc.setTextColor(100, 100, 100)
+    doc.setFontSize(10)
+    doc.text('Amount Due', 130, 68)
+    doc.setTextColor(255, 0, 110)
+    doc.setFontSize(20)
+    doc.text(`£${invoice.amount.toLocaleString()}`, 130, 80)
+    
+    // Status
+    doc.setFontSize(10)
+    doc.setTextColor(100, 100, 100)
+    doc.text(`Status: ${invoice.status.toUpperCase()}`, 20, 100)
+    doc.text(`Due Date: ${invoice.due_date}`, 20, 107)
+    
+    // Footer
+    doc.setDrawColor(255, 0, 110)
+    doc.line(20, 250, 190, 250)
+    doc.setTextColor(100, 100, 100)
+    doc.setFontSize(10)
+    doc.text('Thank you for your business!', 20, 260)
+    doc.text('Joto Ltd - info@jotoltd.com', 20, 267)
+    
+    doc.save(`${invoice.invoice_number}.pdf`)
   }
 
   const handleCreateInvoice = async (e: React.FormEvent) => {
@@ -483,6 +566,85 @@ export default function AdminDashboard() {
                 ))}
               </div>
 
+              {/* Analytics Charts */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Revenue Chart */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="glass-neon rounded-2xl p-6"
+                >
+                  <h2 className="text-lg font-bold text-white mb-4">Invoice Status</h2>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <PieChart>
+                      <Pie
+                        data={[
+                          { name: 'Paid', value: invoices.filter((i: Invoice) => i.status === 'paid').length, color: '#10B981' },
+                          { name: 'Pending', value: invoices.filter((i: Invoice) => i.status === 'pending').length, color: '#F59E0B' },
+                          { name: 'Overdue', value: invoices.filter((i: Invoice) => i.status === 'overdue').length, color: '#EF4444' },
+                        ]}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={80}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {[
+                          { name: 'Paid', value: invoices.filter((i: Invoice) => i.status === 'paid').length, color: '#10B981' },
+                          { name: 'Pending', value: invoices.filter((i: Invoice) => i.status === 'pending').length, color: '#F59E0B' },
+                          { name: 'Overdue', value: invoices.filter((i: Invoice) => i.status === 'overdue').length, color: '#EF4444' },
+                        ].map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#1a1a2e', border: 'none', borderRadius: '8px', color: '#fff' }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="flex justify-center gap-4 mt-4">
+                    {[
+                      { label: 'Paid', color: '#10B981', count: invoices.filter((i: Invoice) => i.status === 'paid').length },
+                      { label: 'Pending', color: '#F59E0B', count: invoices.filter((i: Invoice) => i.status === 'pending').length },
+                      { label: 'Overdue', color: '#EF4444', count: invoices.filter((i: Invoice) => i.status === 'overdue').length },
+                    ].map((item) => (
+                      <div key={item.label} className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                        <span className="text-sm text-slate-400">{item.label} ({item.count})</span>
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+
+                {/* Project Status Chart */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                  className="glass-neon rounded-2xl p-6"
+                >
+                  <h2 className="text-lg font-bold text-white mb-4">Project Status</h2>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={[
+                      { name: 'In Progress', count: projects.filter((p: Project) => p.status === 'in_progress').length, fill: '#3B82F6' },
+                      { name: 'Review', count: projects.filter((p: Project) => p.status === 'review').length, fill: '#8B5CF6' },
+                      { name: 'Completed', count: projects.filter((p: Project) => p.status === 'completed').length, fill: '#10B981' },
+                      { name: 'On Hold', count: projects.filter((p: Project) => p.status === 'on_hold').length, fill: '#6B7280' },
+                    ]}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                      <XAxis dataKey="name" stroke="#94A3B8" fontSize={12} />
+                      <YAxis stroke="#94A3B8" fontSize={12} />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#1a1a2e', border: 'none', borderRadius: '8px', color: '#fff' }}
+                      />
+                      <Bar dataKey="count" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </motion.div>
+              </div>
+
               {/* Recent Activity */}
               <div className="glass-neon rounded-2xl p-6">
                 <h2 className="text-xl font-bold text-white mb-4">Recent Invoices</h2>
@@ -603,8 +765,12 @@ export default function AdminDashboard() {
                               <button onClick={() => handleDeleteInvoice(invoice.id)} className="p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-red-400" title="Delete invoice">
                                 <Trash2 className="w-4 h-4" />
                               </button>
-                              <button className="p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white" title="Send invoice">
-                                <Send className="w-4 h-4" />
+                              <button 
+                                onClick={() => handleDownloadInvoice(invoice, invoice.client?.name || 'Client')}
+                                className="p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white" 
+                                title="Download PDF"
+                              >
+                                <Download className="w-4 h-4" />
                               </button>
                             </div>
                           </td>
