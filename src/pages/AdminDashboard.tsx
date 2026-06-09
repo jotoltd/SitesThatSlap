@@ -12,7 +12,7 @@ import {
   Users, FileText, Plus, LogOut, DollarSign, TrendingUp,
   CheckCircle, XCircle, Clock, Send, Trash2, Edit2,
   Search, Filter, Download, Menu, X, Loader2, MessageSquare, Upload,
-  CalendarDays
+  CalendarDays, LayoutGrid
 } from 'lucide-react'
 
 interface Client {
@@ -81,7 +81,7 @@ interface ProjectFile {
 
 export default function AdminDashboard() {
   const { user, logout } = useAuth()
-  const [activeTab, setActiveTab] = useState<'overview' | 'clients' | 'invoices' | 'projects' | 'messages' | 'calendar'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'clients' | 'invoices' | 'projects' | 'messages' | 'calendar' | 'kanban'>('overview')
   const [searchTerm, setSearchTerm] = useState('')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [clients, setClients] = useState<Client[]>([])
@@ -738,6 +738,7 @@ export default function AdminDashboard() {
                 { id: 'clients', label: 'Clients', icon: Users },
                 { id: 'invoices', label: 'Invoices', icon: FileText },
                 { id: 'projects', label: 'Projects', icon: CheckCircle },
+                { id: 'kanban', label: 'Kanban', icon: LayoutGrid },
                 { id: 'messages', label: 'Messages', icon: MessageSquare, badge: unreadCount },
                 { id: 'calendar', label: 'Calendar', icon: CalendarDays },
               ].map((item, i) => (
@@ -791,6 +792,7 @@ export default function AdminDashboard() {
               { id: 'clients', label: 'Clients', icon: Users },
               { id: 'invoices', label: 'Invoices', icon: FileText },
               { id: 'projects', label: 'Projects', icon: CheckCircle },
+              { id: 'kanban', label: 'Kanban', icon: LayoutGrid },
               { id: 'messages', label: 'Messages', icon: MessageSquare, badge: unreadCount },
               { id: 'calendar', label: 'Calendar', icon: CalendarDays },
             ].map((item) => (
@@ -1576,6 +1578,175 @@ export default function AdminDashboard() {
                     <p className="text-2xl font-bold text-white">
                       £{filteredInvoices.filter(i => i.status === 'pending').reduce((sum, i) => sum + i.amount, 0).toLocaleString()}
                     </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'kanban' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h1 className="text-3xl font-black text-white">Kanban Board</h1>
+                <button 
+                  onClick={() => setShowProjectModal(true)}
+                  className="px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-bold flex items-center gap-2"
+                >
+                  <Plus className="w-5 h-5" /> New Project
+                </button>
+              </div>
+
+              {/* Kanban Columns */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {/* In Progress */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 pb-2 border-b-2 border-blue-500">
+                    <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                    <h2 className="font-bold text-white">In Progress</h2>
+                    <span className="ml-auto text-sm text-slate-400">
+                      {filteredProjects.filter(p => p.status === 'in_progress').length}
+                    </span>
+                  </div>
+                  <div className="space-y-3">
+                    {filteredProjects
+                      .filter(p => p.status === 'in_progress')
+                      .map(project => (
+                        <motion.div
+                          key={project.id}
+                          layoutId={project.id}
+                          className="glass-neon rounded-xl p-4 cursor-pointer hover:bg-white/5 transition-colors"
+                          onClick={() => setEditingProject(project)}
+                        >
+                          <h3 className="font-semibold text-white mb-1">{project.name}</h3>
+                          <p className="text-sm text-slate-400 mb-3">{project.client?.name || 'Unknown'}</p>
+                          <div className="flex items-center justify-between">
+                            <div className="w-20 h-2 rounded-full bg-white/10 overflow-hidden">
+                              <div 
+                                className="h-full bg-blue-500 rounded-full"
+                                style={{ width: `${project.progress}%` }}
+                              />
+                            </div>
+                            <span className="text-xs text-slate-400">{project.progress}%</span>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-2">
+                            Due: {new Date(project.deadline).toLocaleDateString()}
+                          </p>
+                        </motion.div>
+                      ))}
+                  </div>
+                </div>
+
+                {/* Review */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 pb-2 border-b-2 border-purple-500">
+                    <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+                    <h2 className="font-bold text-white">Review</h2>
+                    <span className="ml-auto text-sm text-slate-400">
+                      {filteredProjects.filter(p => p.status === 'review').length}
+                    </span>
+                  </div>
+                  <div className="space-y-3">
+                    {filteredProjects
+                      .filter(p => p.status === 'review')
+                      .map(project => (
+                        <motion.div
+                          key={project.id}
+                          layoutId={project.id}
+                          className="glass-neon rounded-xl p-4 cursor-pointer hover:bg-white/5 transition-colors"
+                          onClick={() => setEditingProject(project)}
+                        >
+                          <h3 className="font-semibold text-white mb-1">{project.name}</h3>
+                          <p className="text-sm text-slate-400 mb-3">{project.client?.name || 'Unknown'}</p>
+                          <div className="flex items-center justify-between">
+                            <div className="w-20 h-2 rounded-full bg-white/10 overflow-hidden">
+                              <div 
+                                className="h-full bg-purple-500 rounded-full"
+                                style={{ width: `${project.progress}%` }}
+                              />
+                            </div>
+                            <span className="text-xs text-slate-400">{project.progress}%</span>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-2">
+                            Due: {new Date(project.deadline).toLocaleDateString()}
+                          </p>
+                        </motion.div>
+                      ))}
+                  </div>
+                </div>
+
+                {/* Completed */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 pb-2 border-b-2 border-green-500">
+                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                    <h2 className="font-bold text-white">Completed</h2>
+                    <span className="ml-auto text-sm text-slate-400">
+                      {filteredProjects.filter(p => p.status === 'completed').length}
+                    </span>
+                  </div>
+                  <div className="space-y-3">
+                    {filteredProjects
+                      .filter(p => p.status === 'completed')
+                      .map(project => (
+                        <motion.div
+                          key={project.id}
+                          layoutId={project.id}
+                          className="glass-neon rounded-xl p-4 cursor-pointer hover:bg-white/5 transition-colors"
+                          onClick={() => setEditingProject(project)}
+                        >
+                          <h3 className="font-semibold text-white mb-1">{project.name}</h3>
+                          <p className="text-sm text-slate-400 mb-3">{project.client?.name || 'Unknown'}</p>
+                          <div className="flex items-center justify-between">
+                            <div className="w-20 h-2 rounded-full bg-white/10 overflow-hidden">
+                              <div 
+                                className="h-full bg-green-500 rounded-full"
+                                style={{ width: `${project.progress}%` }}
+                              />
+                            </div>
+                            <span className="text-xs text-slate-400">{project.progress}%</span>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-2">
+                            Due: {new Date(project.deadline).toLocaleDateString()}
+                          </p>
+                        </motion.div>
+                      ))}
+                  </div>
+                </div>
+
+                {/* On Hold */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 pb-2 border-b-2 border-yellow-500">
+                    <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                    <h2 className="font-bold text-white">On Hold</h2>
+                    <span className="ml-auto text-sm text-slate-400">
+                      {filteredProjects.filter(p => p.status === 'on_hold').length}
+                    </span>
+                  </div>
+                  <div className="space-y-3">
+                    {filteredProjects
+                      .filter(p => p.status === 'on_hold')
+                      .map(project => (
+                        <motion.div
+                          key={project.id}
+                          layoutId={project.id}
+                          className="glass-neon rounded-xl p-4 cursor-pointer hover:bg-white/5 transition-colors"
+                          onClick={() => setEditingProject(project)}
+                        >
+                          <h3 className="font-semibold text-white mb-1">{project.name}</h3>
+                          <p className="text-sm text-slate-400 mb-3">{project.client?.name || 'Unknown'}</p>
+                          <div className="flex items-center justify-between">
+                            <div className="w-20 h-2 rounded-full bg-white/10 overflow-hidden">
+                              <div 
+                                className="h-full bg-yellow-500 rounded-full"
+                                style={{ width: `${project.progress}%` }}
+                              />
+                            </div>
+                            <span className="text-xs text-slate-400">{project.progress}%</span>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-2">
+                            Due: {new Date(project.deadline).toLocaleDateString()}
+                          </p>
+                        </motion.div>
+                      ))}
                   </div>
                 </div>
               </div>
