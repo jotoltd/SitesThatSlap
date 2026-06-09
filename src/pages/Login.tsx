@@ -69,7 +69,7 @@ export default function Login() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-12 pr-4 py-4 rounded-xl neon-input bg-[#0a0a1a] text-white placeholder-slate-500"
-                  placeholder="admin@sitesthatslap.com or client@example.com"
+                  placeholder="hello@sitesthatslap.com"
                   required
                 />
               </div>
@@ -104,12 +104,6 @@ export default function Login() {
               )}
             </motion.button>
           </form>
-
-          <div className="mt-6 p-4 rounded-xl bg-white/5 text-xs text-slate-500">
-            <p className="font-semibold mb-1 text-slate-400">Demo Credentials:</p>
-            <p><span className="text-slap-pink">Admin:</span> admin@sitesthatslap.com / admin123</p>
-            <p><span className="text-slap-cyan">Client:</span> client@example.com / client123</p>
-          </div>
         </div>
       </motion.div>
     </div>

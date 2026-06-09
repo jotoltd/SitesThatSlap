@@ -155,7 +155,7 @@ export default function ClientDashboard() {
     doc.setTextColor(100, 100, 100)
     doc.setFontSize(10)
     doc.text('Thank you for your business!', 20, 260)
-    doc.text('Sites That Slap - info@sitesthatslap.com', 20, 267)
+    doc.text('Sites That Slap - hello@sitesthatslap.com', 20, 267)
     
     doc.save(`${invoice.invoice_number}.pdf`)
   }
