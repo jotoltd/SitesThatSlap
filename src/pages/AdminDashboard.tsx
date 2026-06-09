@@ -12,7 +12,7 @@ import {
   Users, FileText, Plus, LogOut, DollarSign, TrendingUp,
   CheckCircle, XCircle, Clock, Send, Trash2, Edit2,
   Search, Filter, Download, Menu, X, Loader2, MessageSquare, Upload,
-  CalendarDays, LayoutGrid
+  CalendarDays, LayoutGrid, Github
 } from 'lucide-react'
 
 interface Client {
@@ -57,7 +57,19 @@ interface Project {
   status: 'in_progress' | 'review' | 'completed' | 'on_hold'
   progress: number
   deadline: string
+  github_repo_url?: string
+  github_branch?: string
   client?: Client
+}
+
+interface ProjectSummary {
+  id: string
+  project_id: string
+  summary: string
+  commit_count: number
+  commits_data: any
+  date: string
+  created_at: string
 }
 
 interface Message {
@@ -117,6 +129,10 @@ export default function AdminDashboard() {
   const [selectedProjectForComments, setSelectedProjectForComments] = useState<string | null>(null)
   const [projectComments, setProjectComments] = useState<ProjectComment[]>([])
   const [newComment, setNewComment] = useState('')
+  const [selectedProjectForGitHub, setSelectedProjectForGitHub] = useState<string | null>(null)
+  const [projectSummaries, setProjectSummaries] = useState<ProjectSummary[]>([])
+  const [githubLoading, setGithubLoading] = useState(false)
+  const [githubToken, setGithubToken] = useState('')
 
   useEffect(() => {
     fetchData()
@@ -245,6 +261,126 @@ export default function AdminDashboard() {
     if (selectedProjectForFiles) {
       fetchProjectFiles(selectedProjectForFiles)
     }
+  }
+
+  // GitHub Integration Functions
+  const extractGitHubInfo = (repoUrl: string) => {
+    const match = repoUrl.match(/github\.com\/([^\/]+)\/([^\/\.]+)/)
+    if (!match) return null
+    return { owner: match[1], repo: match[2] }
+  }
+
+  const fetchGitHubCommits = async (project: Project, since?: string, until?: string) => {
+    if (!project.github_repo_url) {
+      toast.error('No GitHub repo linked to this project')
+      return null
+    }
+    const repoInfo = extractGitHubInfo(project.github_repo_url)
+    if (!repoInfo) {
+      toast.error('Invalid GitHub repo URL')
+      return null
+    }
+    setGithubLoading(true)
+    try {
+      let url = `https://api.github.com/repos/${repoInfo.owner}/${repoInfo.repo}/commits?sha=${project.github_branch || 'main'}&per_page=100`
+      if (since) url += `&since=${since}`
+      if (until) url += `&until=${until}`
+      const response = await fetch(url, {
+        headers: {
+          'Accept': 'application/vnd.github.v3+json',
+          ...(githubToken && { 'Authorization': `token ${githubToken}` })
+        }
+      })
+      if (!response.ok) {
+        if (response.status === 404) {
+          toast.error('Repo not found. Check URL and make sure it\'s public or provide a GitHub token')
+        } else if (response.status === 403) {
+          toast.error('GitHub API rate limit exceeded. Please add a GitHub token')
+        } else {
+          toast.error('Failed to fetch commits from GitHub')
+        }
+        return null
+      }
+      const commits = await response.json()
+      return commits
+    } catch (err) {
+      toast.error('Error fetching GitHub commits')
+      return null
+    } finally {
+      setGithubLoading(false)
+    }
+  }
+
+  const summarizeCommits = async (commits: any[]): Promise<string> => {
+    if (commits.length === 0) return 'No commits today'
+    const categories: Record<string, number> = {}
+    commits.forEach(c => {
+      const msg = c.commit.message.toLowerCase()
+      if (msg.includes('fix') || msg.includes('bug')) {
+        categories['Bug Fixes'] = (categories['Bug Fixes'] || 0) + 1
+      } else if (msg.includes('feature') || msg.includes('add') || msg.includes('new')) {
+        categories['New Features'] = (categories['New Features'] || 0) + 1
+      } else if (msg.includes('update') || msg.includes('refactor') || msg.includes('improve')) {
+        categories['Updates & Improvements'] = (categories['Updates & Improvements'] || 0) + 1
+      } else if (msg.includes('style') || msg.includes('css') || msg.includes('ui')) {
+        categories['UI/Styling'] = (categories['UI/Styling'] || 0) + 1
+      } else if (msg.includes('test')) {
+        categories['Tests'] = (categories['Tests'] || 0) + 1
+      } else if (msg.includes('doc') || msg.includes('readme')) {
+        categories['Documentation'] = (categories['Documentation'] || 0) + 1
+      } else {
+        categories['Other Changes'] = (categories['Other Changes'] || 0) + 1
+      }
+    })
+    const summaryLines: string[] = []
+    summaryLines.push(`${commits.length} commit${commits.length === 1 ? '' : 's'} today`)
+    Object.entries(categories).forEach(([cat, count]) => {
+      summaryLines.push(`• ${cat}: ${count}`)
+    })
+    const mainMessages = commits.slice(0, 3).map(c => c.commit.message.split('\n')[0])
+    if (mainMessages.length > 0) {
+      summaryLines.push('\nKey updates:')
+      mainMessages.forEach(msg => {
+        const cleanMsg = msg.replace(/^\[.*?\]\s*/, '').replace(/^[a-z]+:\s*/i, '')
+        if (cleanMsg.length > 5) {
+          summaryLines.push(`  - ${cleanMsg.charAt(0).toUpperCase() + cleanMsg.slice(1)}`)
+        }
+      })
+    }
+    return summaryLines.join('\n')
+  }
+
+  const generateDailySummary = async (project: Project) => {
+    const yesterday = new Date()
+    yesterday.setDate(yesterday.getDate() - 1)
+    const startOfDay = new Date(yesterday.setHours(0, 0, 0, 0)).toISOString()
+    const endOfDay = new Date(yesterday.setHours(23, 59, 59, 999)).toISOString()
+    const commits = await fetchGitHubCommits(project, startOfDay, endOfDay)
+    if (!commits) return
+    const summary = await summarizeCommits(commits)
+    const { error } = await supabase.from('project_summaries').insert({
+      project_id: project.id,
+      summary,
+      commit_count: commits.length,
+      commits_data: commits.slice(0, 50),
+      date: yesterday.toISOString().split('T')[0]
+    })
+    if (error) {
+      toast.error('Failed to save summary')
+    } else {
+      toast.success(`Generated summary for ${commits.length} commits`)
+      fetchProjectSummaries(project.id)
+    }
+  }
+
+  const fetchProjectSummaries = async (projectId: string) => {
+    const { data } = await supabase
+      .from('project_summaries')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('date', { ascending: false })
+      .limit(30)
+    setProjectSummaries(data || [])
   }
 
   const handleDownloadFile = async (file: ProjectFile) => {
@@ -544,7 +680,9 @@ export default function AdminDashboard() {
       description: formData.get('description') as string,
       status: formData.get('status') as 'in_progress' | 'review' | 'completed' | 'on_hold',
       progress: Number(formData.get('progress')),
-      deadline: formData.get('deadline') as string
+      deadline: formData.get('deadline') as string,
+      github_repo_url: formData.get('github_repo_url') as string || null,
+      github_branch: formData.get('github_branch') as string || 'main'
     }
 
     const { error } = await supabase.from('projects').insert(newProject)
@@ -1467,6 +1605,77 @@ export default function AdminDashboard() {
                           </motion.div>
                         )}
                       </div>
+
+                      {/* GitHub Integration Section */}
+                      {project.github_repo_url && (
+                        <div className="border-t border-white/10 pt-4 mt-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <span className="text-sm font-semibold text-white flex items-center gap-2">
+                              <Github className="w-4 h-4" /> GitHub Activity
+                            </span>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => {
+                                  setSelectedProjectForGitHub(project.id)
+                                  fetchProjectSummaries(project.id)
+                                }}
+                                className="text-xs text-slate-400 hover:text-white"
+                              >
+                                {selectedProjectForGitHub === project.id ? 'Hide' : 'View'} Summaries
+                              </button>
+                              <button
+                                onClick={() => generateDailySummary(project)}
+                                disabled={githubLoading}
+                                className="text-xs px-2 py-1 rounded bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-slate-300 hover:text-white disabled:opacity-50"
+                              >
+                                {githubLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Generate Yesterday\'s Summary'}
+                              </button>
+                            </div>
+                          </div>
+                          
+                          {selectedProjectForGitHub === project.id && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: 'auto' }}
+                              className="space-y-3"
+                            >
+                              {/* GitHub Token Input */}
+                              <div className="flex gap-2 mb-3">
+                                <input
+                                  type="password"
+                                  value={githubToken}
+                                  onChange={(e) => setGithubToken(e.target.value)}
+                                  placeholder="GitHub token (optional, for private repos)"
+                                  className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm"
+                                />
+                              </div>
+                              
+                              {/* Summaries List */}
+                              <div className="max-h-60 overflow-y-auto space-y-3">
+                                {projectSummaries.length === 0 ? (
+                                  <p className="text-sm text-slate-500 italic">No summaries yet. Click "Generate Yesterday's Summary" to create one.</p>
+                                ) : (
+                                  projectSummaries.map((summary) => (
+                                    <div key={summary.id} className="p-3 rounded-lg bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/30">
+                                      <div className="flex items-center justify-between mb-2">
+                                        <span className="font-semibold text-white text-xs">
+                                          {new Date(summary.date).toLocaleDateString()}
+                                        </span>
+                                        <span className="text-xs text-slate-400">
+                                          {summary.commit_count} commit{summary.commit_count !== 1 ? 's' : ''}
+                                        </span>
+                                      </div>
+                                      <pre className="text-sm text-slate-300 whitespace-pre-wrap font-sans">
+                                        {summary.summary}
+                                      </pre>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            </motion.div>
+                          )}
+                        </div>
+                      )}
                     </motion.div>
                   ))}
                 </div>
@@ -2108,6 +2317,30 @@ export default function AdminDashboard() {
                   <label className="block text-slate-400 text-sm mb-2">Deadline</label>
                   <input name="deadline" type="date" required className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" />
                 </div>
+                
+                {/* GitHub Integration */}
+                <div className="border-t border-white/10 pt-4 mt-4">
+                  <label className="block text-slate-400 text-sm mb-2 flex items-center gap-2">
+                    <Github className="w-4 h-4" /> GitHub Repo (Optional)
+                  </label>
+                  <input 
+                    name="github_repo_url" 
+                    type="url" 
+                    placeholder="https://github.com/owner/repo" 
+                    className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white mb-2" 
+                  />
+                  <input 
+                    name="github_branch" 
+                    type="text" 
+                    defaultValue="main"
+                    placeholder="main" 
+                    className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm" 
+                  />
+                  <p className="text-xs text-slate-500 mt-1">
+                    Link a GitHub repo to track commits and generate daily summaries
+                  </p>
+                </div>
+                
                 <div className="flex gap-4 pt-4">
                   <button type="button" onClick={() => setShowProjectModal(false)} className="flex-1 px-4 py-3 rounded-xl bg-white/5 text-white font-bold hover:bg-white/10">
                     Cancel
@@ -2302,6 +2535,31 @@ export default function AdminDashboard() {
                   <label className="block text-slate-400 text-sm mb-2">Deadline</label>
                   <input name="deadline" type="date" required defaultValue={editingProject.deadline} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" />
                 </div>
+                
+                {/* GitHub Integration */}
+                <div className="border-t border-white/10 pt-4 mt-4">
+                  <label className="block text-slate-400 text-sm mb-2 flex items-center gap-2">
+                    <Github className="w-4 h-4" /> GitHub Repo (Optional)
+                  </label>
+                  <input 
+                    name="github_repo_url" 
+                    type="url" 
+                    defaultValue={editingProject.github_repo_url || ''}
+                    placeholder="https://github.com/owner/repo" 
+                    className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white mb-2" 
+                  />
+                  <input 
+                    name="github_branch" 
+                    type="text" 
+                    defaultValue={editingProject.github_branch || 'main'}
+                    placeholder="main" 
+                    className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm" 
+                  />
+                  <p className="text-xs text-slate-500 mt-1">
+                    Link a GitHub repo to track commits and generate daily summaries
+                  </p>
+                </div>
+                
                 <div className="flex gap-4 pt-4">
                   <button type="button" onClick={() => setEditingProject(null)} className="flex-1 px-4 py-3 rounded-xl bg-white/5 text-white font-bold hover:bg-white/10">
                     Cancel
