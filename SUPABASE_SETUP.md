@@ -72,3 +72,19 @@ VITE_SUPABASE_ANON_KEY=your_anon_key_here
 ```
 
 Get your anon key from: Supabase Dashboard → Settings → API
+
+## ⚠️ IMPORTANT: Email Confirmation Settings
+
+For clients to login immediately when created by admin (without email confirmation):
+
+1. Go to **Authentication** → **Providers** → **Email**
+2. Turn OFF **"Confirm email"** toggle
+3. Click **Save**
+
+If email confirmation is enabled, clients will receive an email and must click the confirmation link before they can login.
+
+### Email Settings (Optional)
+To send actual confirmation emails, configure an email provider:
+1. Go to **Authentication** → **Email Templates**
+2. Customize the confirmation email template
+3. Set up an SMTP provider (Resend, SendGrid, etc.) in **Settings** → **Authentication**

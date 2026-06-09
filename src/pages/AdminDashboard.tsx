@@ -327,27 +327,35 @@ export default function AdminDashboard() {
     const website = formData.get('website') as string
     const notes = formData.get('notes') as string
 
-    // Create auth user - profile will be created by trigger
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          name,
-          role: 'client'
+    try {
+      // Create auth user - profile will be created by trigger
+      // Note: If email confirmation is enabled in Supabase, user will need to confirm email before login
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name,
+            role: 'client'
+          },
+          emailRedirectTo: window.location.origin + '/login'
         }
+      })
+
+      if (authError) {
+        alert('Error creating client: ' + authError.message)
+        setCreatingClient(false)
+        return
       }
-    })
 
-    if (authError) {
-      alert('Error creating client: ' + authError.message)
-      setCreatingClient(false)
-      return
-    }
+      if (!authData.user) {
+        alert('Error: No user returned from signup')
+        setCreatingClient(false)
+        return
+      }
 
-    // Wait a moment for trigger to create profile, then update with additional fields
-    if (authData.user) {
-      await new Promise(resolve => setTimeout(resolve, 500))
+      // Wait for trigger to create profile, then update with additional fields
+      await new Promise(resolve => setTimeout(resolve, 800))
       
       const { error: updateError } = await supabase
         .from('profiles')
@@ -363,11 +371,25 @@ export default function AdminDashboard() {
       if (updateError) {
         console.error('Error updating profile:', updateError)
       }
-    }
 
-    setShowClientModal(false)
-    fetchData()
-    setCreatingClient(false)
+      // Show success message
+      if (authData.session) {
+        // User can login immediately (email confirmation disabled)
+        alert(`Client "${name}" created successfully!\n\nThey can now login with:\nEmail: ${email}\nPassword: ${password}`)
+      } else {
+        // Email confirmation required
+        alert(`Client "${name}" created successfully!\n\nIMPORTANT: An email confirmation has been sent to ${email}. The client must click the link in the email before they can login.\n\nEmail: ${email}\nPassword: ${password}`)
+      }
+
+      setShowClientModal(false)
+      form.reset()
+      fetchData()
+    } catch (err) {
+      console.error('Error creating client:', err)
+      alert('An unexpected error occurred. Please try again.')
+    } finally {
+      setCreatingClient(false)
+    }
   }
 
   const handleDeleteProject = async (id: string) => {
@@ -1357,7 +1379,11 @@ export default function AdminDashboard() {
               className="glass-neon rounded-2xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
-              <h2 className="text-2xl font-black text-white mb-6">Create Client</h2>
+              <h2 className="text-2xl font-black text-white mb-2">Create Client</h2>
+              <p className="text-xs text-slate-400 mb-4">
+                Client will receive an account with login credentials. 
+                <span className="text-slap-pink">*</span> Required fields
+              </p>
               <form onSubmit={handleCreateClient} className="space-y-4">
                 {/* Required Fields */}
                 <div className="border-b border-white/10 pb-4">
