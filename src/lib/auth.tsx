@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react'
 import { supabase } from './supabase'
 
 export interface User {
@@ -22,7 +22,14 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [suppressAuthChange, setSuppressAuthChange] = useState(false)
+  const [suppressAuthChange, setSuppressAuthChangeState] = useState(false)
+  // Use ref for synchronous access in listener closure
+  const suppressAuthChangeRef = useRef(false)
+  
+  const setSuppressAuthChange = (value: boolean) => {
+    suppressAuthChangeRef.current = value
+    setSuppressAuthChangeState(value)
+  }
 
   useEffect(() => {
     // Check for existing session
@@ -37,7 +44,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       // If suppressed (e.g. admin is creating a client), ignore the event
-      if (suppressAuthChange) return
+      // Use ref for synchronous check (state would be stale in closure)
+      if (suppressAuthChangeRef.current) return
       if (session?.user) {
         fetchUserProfile(session.user.id)
       } else {
@@ -47,7 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
 
     return () => subscription.unsubscribe()
-  }, [suppressAuthChange])
+  }, [])
 
   const fetchUserProfile = async (userId: string) => {
     const { data, error } = await supabase
