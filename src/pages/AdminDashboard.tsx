@@ -48,6 +48,7 @@ export default function AdminDashboard() {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
+  const [showProjectModal, setShowProjectModal] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -91,6 +92,31 @@ export default function AdminDashboard() {
     fetchData()
   }
 
+  const handleCreateProject = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const form = e.target as HTMLFormElement
+    const formData = new FormData(form)
+
+    const newProject = {
+      client_id: formData.get('client_id') as string,
+      name: formData.get('name') as string,
+      description: formData.get('description') as string,
+      status: formData.get('status') as 'in_progress' | 'review' | 'completed' | 'on_hold',
+      progress: Number(formData.get('progress')),
+      deadline: formData.get('deadline') as string
+    }
+
+    await supabase.from('projects').insert(newProject)
+    setShowProjectModal(false)
+    fetchData()
+  }
+
+  const handleDeleteProject = async (id: string) => {
+    if (!confirm('Delete this project?')) return
+    await supabase.from('projects').delete().eq('id', id)
+    fetchData()
+  }
+
   const handleLogout = () => {
     logout()
     window.location.href = '/login'
@@ -120,6 +146,9 @@ export default function AdminDashboard() {
               </div>
             </div>
             <div className="flex items-center gap-2 md:gap-4">
+              <button onClick={() => setShowProjectModal(true)} className="hidden md:flex p-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-bold text-sm items-center gap-2">
+                <Plus className="w-4 h-4" /> <span className="hidden sm:inline">New Project</span>
+              </button>
               <button onClick={() => setShowInvoiceModal(true)} className="hidden md:flex p-2 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold text-sm items-center gap-2">
                 <Plus className="w-4 h-4" /> <span className="hidden sm:inline">New Invoice</span>
               </button>
@@ -180,8 +209,11 @@ export default function AdminDashboard() {
                   {item.label}
                 </motion.button>
               ))}
-              <div className="pt-4 border-t border-white/10">
-                <button className="w-full p-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold flex items-center justify-center gap-2">
+              <div className="pt-4 border-t border-white/10 space-y-2">
+                <button onClick={() => { setShowProjectModal(true); setMobileMenuOpen(false); }} className="w-full p-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-bold flex items-center justify-center gap-2">
+                  <Plus className="w-4 h-4" /> New Project
+                </button>
+                <button onClick={() => { setShowInvoiceModal(true); setMobileMenuOpen(false); }} className="w-full p-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold flex items-center justify-center gap-2">
                   <Plus className="w-4 h-4" /> New Invoice
                 </button>
               </div>
@@ -439,18 +471,27 @@ export default function AdminDashboard() {
                       animate={{ opacity: 1, y: 0 }}
                       className="glass-neon rounded-2xl p-6"
                     >
-                      <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-start justify-between mb-4">
                         <div>
                           <h3 className="font-bold text-white text-lg">{project.name}</h3>
                           <p className="text-slate-400">{project.client?.name || 'Unknown'}</p>
                         </div>
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                          project.status === 'in_progress' ? 'bg-blue-500/20 text-blue-400' :
-                          project.status === 'review' ? 'bg-purple-500/20 text-purple-400' :
-                          'bg-green-500/20 text-green-400'
-                        }`}>
-                          {project.status.replace('_', ' ')}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                            project.status === 'in_progress' ? 'bg-blue-500/20 text-blue-400' :
+                            project.status === 'review' ? 'bg-purple-500/20 text-purple-400' :
+                            'bg-green-500/20 text-green-400'
+                          }`}>
+                            {project.status.replace('_', ' ')}
+                          </span>
+                          <button
+                            onClick={() => handleDeleteProject(project.id)}
+                            className="p-1.5 rounded-lg hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-colors"
+                            title="Delete project"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                       <div className="w-full h-2 bg-slate-700 rounded-full overflow-hidden mb-3">
                         <div 
@@ -530,6 +571,71 @@ export default function AdminDashboard() {
                     Cancel
                   </button>
                   <button type="submit" className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold">
+                    Create
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* Project Modal */}
+        {showProjectModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+            onClick={() => setShowProjectModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="glass-neon rounded-2xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 className="text-2xl font-black text-white mb-6">Create Project</h2>
+              <form onSubmit={handleCreateProject} className="space-y-4">
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Client</label>
+                  <select name="client_id" required className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white">
+                    <option value="">Select client</option>
+                    {clients.map((c: Client) => (
+                      <option key={c.id} value={c.id}>{c.name} ({c.email})</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Project Name</label>
+                  <input name="name" type="text" required placeholder="Website Redesign" className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" />
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Description</label>
+                  <textarea name="description" rows={3} placeholder="Brief project description..." className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white resize-none" />
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Status</label>
+                  <select name="status" required className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white">
+                    <option value="in_progress">In Progress</option>
+                    <option value="review">In Review</option>
+                    <option value="completed">Completed</option>
+                    <option value="on_hold">On Hold</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Progress (%)</label>
+                  <input name="progress" type="number" required min="0" max="100" defaultValue="0" className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" />
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Deadline</label>
+                  <input name="deadline" type="date" required className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" />
+                </div>
+                <div className="flex gap-4 pt-4">
+                  <button type="button" onClick={() => setShowProjectModal(false)} className="flex-1 px-4 py-3 rounded-xl bg-white/5 text-white font-bold hover:bg-white/10">
+                    Cancel
+                  </button>
+                  <button type="submit" className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-bold">
                     Create
                   </button>
                 </div>
