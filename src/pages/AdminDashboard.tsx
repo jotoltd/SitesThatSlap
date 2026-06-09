@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
 import { jsPDF } from 'jspdf'
+import { toast } from 'sonner'
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   PieChart, Pie, Cell 
@@ -26,6 +27,15 @@ interface Client {
   notes?: string
 }
 
+interface InvoiceItem {
+  id: string
+  invoice_id: string
+  description: string
+  quantity: number
+  rate: number
+  amount: number
+}
+
 interface Invoice {
   id: string
   invoice_number: string
@@ -35,6 +45,7 @@ interface Invoice {
   date: string
   due_date: string
   client?: Client
+  items?: InvoiceItem[]
 }
 
 interface Project {
@@ -213,7 +224,12 @@ export default function AdminDashboard() {
 
   const handleDeleteInvoice = async (id: string) => {
     if (!confirm('Delete this invoice?')) return
-    await supabase.from('invoices').delete().eq('id', id)
+    const { error } = await supabase.from('invoices').delete().eq('id', id)
+    if (error) {
+      toast.error('Failed to delete invoice')
+    } else {
+      toast.success('Invoice deleted')
+    }
     fetchData()
   }
 
@@ -229,8 +245,9 @@ export default function AdminDashboard() {
     const { error } = await supabase.from('profiles').delete().eq('id', id)
     
     if (error) {
-      alert('Error deleting client: ' + error.message)
+      toast.error('Failed to delete client: ' + error.message)
     } else {
+      toast.success('Client deleted')
       fetchData()
     }
   }
@@ -258,8 +275,9 @@ export default function AdminDashboard() {
       .eq('id', editingClient.id)
 
     if (error) {
-      alert('Error updating client: ' + error.message)
+      toast.error('Failed to update client')
     } else {
+      toast.success('Client updated')
       setEditingClient(null)
       fetchData()
     }
@@ -337,7 +355,12 @@ export default function AdminDashboard() {
       due_date: formData.get('due_date') as string
     }
     
-    await supabase.from('invoices').insert(newInvoice)
+    const { error } = await supabase.from('invoices').insert(newInvoice)
+    if (error) {
+      toast.error('Failed to create invoice')
+    } else {
+      toast.success('Invoice created successfully')
+    }
     setShowInvoiceModal(false)
     fetchData()
   }
@@ -356,7 +379,12 @@ export default function AdminDashboard() {
       deadline: formData.get('deadline') as string
     }
 
-    await supabase.from('projects').insert(newProject)
+    const { error } = await supabase.from('projects').insert(newProject)
+    if (error) {
+      toast.error('Failed to create project')
+    } else {
+      toast.success('Project created successfully')
+    }
     setShowProjectModal(false)
     fetchData()
   }
@@ -475,7 +503,12 @@ export default function AdminDashboard() {
 
   const handleDeleteProject = async (id: string) => {
     if (!confirm('Delete this project?')) return
-    await supabase.from('projects').delete().eq('id', id)
+    const { error } = await supabase.from('projects').delete().eq('id', id)
+    if (error) {
+      toast.error('Failed to delete project')
+    } else {
+      toast.success('Project deleted')
+    }
     fetchData()
   }
 

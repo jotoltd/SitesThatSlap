@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { Toaster } from 'sonner'
 import {
   Rocket,
   Palette,
@@ -4842,6 +4843,17 @@ function App() {
           </motion.div>
         )}
       </AnimatePresence>
+      
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          style: {
+            background: 'rgba(15, 15, 35, 0.95)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            color: '#fff',
+          },
+        }}
+      />
     </>
   )
 }
