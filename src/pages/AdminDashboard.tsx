@@ -79,6 +79,16 @@ interface ProjectFile {
   created_at: string
 }
 
+interface ProjectComment {
+  id: string
+  project_id: string
+  user_id: string
+  content: string
+  type: 'comment' | 'status_change' | 'file_upload' | 'milestone'
+  created_at: string
+  user?: Client
+}
+
 export default function AdminDashboard() {
   const { user, logout } = useAuth()
   const [activeTab, setActiveTab] = useState<'overview' | 'clients' | 'invoices' | 'projects' | 'messages' | 'calendar' | 'kanban'>('overview')
@@ -93,6 +103,9 @@ export default function AdminDashboard() {
   const [showProjectModal, setShowProjectModal] = useState(false)
   const [showClientModal, setShowClientModal] = useState(false)
   const [creatingClient, setCreatingClient] = useState(false)
+  const [invoiceItems, setInvoiceItems] = useState<{ description: string; quantity: number; rate: number }[]>([
+    { description: '', quantity: 1, rate: 0 }
+  ])
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null)
   const [editingClient, setEditingClient] = useState<Client | null>(null)
@@ -101,6 +114,9 @@ export default function AdminDashboard() {
   const [selectedProjectForFiles, setSelectedProjectForFiles] = useState<string | null>(null)
   const [projectFiles, setProjectFiles] = useState<ProjectFile[]>([])
   const [uploadingFile, setUploadingFile] = useState(false)
+  const [selectedProjectForComments, setSelectedProjectForComments] = useState<string | null>(null)
+  const [projectComments, setProjectComments] = useState<ProjectComment[]>([])
+  const [newComment, setNewComment] = useState('')
 
   useEffect(() => {
     fetchData()
@@ -152,6 +168,30 @@ export default function AdminDashboard() {
     })
     setNewAdminMessage('')
     fetchData()
+  }
+
+  const fetchProjectComments = async (projectId: string) => {
+    const { data } = await supabase
+      .from('project_comments')
+      .select('*, user:profiles(name)')
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: true })
+    setProjectComments(data || [])
+  }
+
+  const handleAddComment = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newComment.trim() || !selectedProjectForComments) return
+    
+    await supabase.from('project_comments').insert({
+      project_id: selectedProjectForComments,
+      user_id: user?.id,
+      content: newComment.trim(),
+      type: 'comment'
+    })
+    setNewComment('')
+    fetchProjectComments(selectedProjectForComments)
+    toast.success('Comment added')
   }
 
   const fetchProjectFiles = async (projectId: string) => {
@@ -423,23 +463,74 @@ export default function AdminDashboard() {
     const form = e.target as HTMLFormElement
     const formData = new FormData(form)
     
-    const newInvoice = {
-      client_id: formData.get('client_id') as string,
-      invoice_number: formData.get('invoice_number') as string,
-      amount: Number(formData.get('amount')),
-      status: formData.get('status') as 'paid' | 'pending' | 'overdue',
-      date: formData.get('date') as string,
-      due_date: formData.get('due_date') as string
+    const clientId = formData.get('client_id') as string
+    const invoiceNumber = formData.get('invoice_number') as string
+    const status = formData.get('status') as 'paid' | 'pending' | 'overdue'
+    const date = formData.get('date') as string
+    const dueDate = formData.get('due_date') as string
+    
+    // Calculate total from line items
+    const validItems = invoiceItems.filter(item => item.description.trim() && item.rate > 0)
+    const totalAmount = validItems.reduce((sum, item) => sum + (item.quantity * item.rate), 0)
+    
+    if (validItems.length === 0) {
+      toast.error('Please add at least one line item')
+      return
     }
     
-    const { error } = await supabase.from('invoices').insert(newInvoice)
-    if (error) {
+    // Create invoice
+    const { data: invoiceData, error: invoiceError } = await supabase
+      .from('invoices')
+      .insert({
+        client_id: clientId,
+        invoice_number: invoiceNumber,
+        amount: totalAmount,
+        status,
+        date,
+        due_date: dueDate
+      })
+      .select()
+      .single()
+    
+    if (invoiceError || !invoiceData) {
       toast.error('Failed to create invoice')
+      return
+    }
+    
+    // Create line items
+    const itemsToInsert = validItems.map(item => ({
+      invoice_id: invoiceData.id,
+      description: item.description,
+      quantity: item.quantity,
+      rate: item.rate,
+      amount: item.quantity * item.rate
+    }))
+    
+    const { error: itemsError } = await supabase.from('invoice_items').insert(itemsToInsert)
+    
+    if (itemsError) {
+      toast.error('Invoice created but failed to add line items')
     } else {
       toast.success('Invoice created successfully')
     }
+    
     setShowInvoiceModal(false)
+    setInvoiceItems([{ description: '', quantity: 1, rate: 0 }])
     fetchData()
+  }
+
+  const addInvoiceItem = () => {
+    setInvoiceItems([...invoiceItems, { description: '', quantity: 1, rate: 0 }])
+  }
+
+  const removeInvoiceItem = (index: number) => {
+    setInvoiceItems(invoiceItems.filter((_, i) => i !== index))
+  }
+
+  const updateInvoiceItem = (index: number, field: string, value: string | number) => {
+    const updated = [...invoiceItems]
+    updated[index] = { ...updated[index], [field]: value }
+    setInvoiceItems(updated)
   }
 
   const handleCreateProject = async (e: React.FormEvent) => {
@@ -1306,6 +1397,76 @@ export default function AdminDashboard() {
                           </motion.div>
                         )}
                       </div>
+
+                      {/* Comments Section */}
+                      <div className="border-t border-white/10 pt-4 mt-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-sm font-semibold text-white flex items-center gap-2">
+                            <MessageSquare className="w-4 h-4" /> Comments & Activity
+                          </span>
+                          <button
+                            onClick={() => {
+                              setSelectedProjectForComments(project.id)
+                              fetchProjectComments(project.id)
+                            }}
+                            className="text-xs text-slate-400 hover:text-white"
+                          >
+                            {selectedProjectForComments === project.id ? 'Hide' : 'View'} Comments
+                          </button>
+                        </div>
+                        
+                        {selectedProjectForComments === project.id && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            className="space-y-3"
+                          >
+                            {/* Comments List */}
+                            <div className="max-h-40 overflow-y-auto space-y-2">
+                              {projectComments.length === 0 ? (
+                                <p className="text-sm text-slate-500 italic">No comments yet</p>
+                              ) : (
+                                projectComments.map((comment: ProjectComment) => (
+                                  <div key={comment.id} className={`p-2 rounded-lg text-sm ${
+                                    comment.type === 'status_change' ? 'bg-purple-500/10 border border-purple-500/30' :
+                                    comment.type === 'file_upload' ? 'bg-blue-500/10 border border-blue-500/30' :
+                                    comment.type === 'milestone' ? 'bg-green-500/10 border border-green-500/30' :
+                                    'bg-white/5'
+                                  }`}>
+                                    <div className="flex items-center justify-between mb-1">
+                                      <span className="font-semibold text-white text-xs">
+                                        {comment.user?.name || 'Admin'}
+                                      </span>
+                                      <span className="text-xs text-slate-500">
+                                        {new Date(comment.created_at).toLocaleDateString()}
+                                      </span>
+                                    </div>
+                                    <p className="text-slate-300">{comment.content}</p>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                            
+                            {/* Add Comment Form */}
+                            <form onSubmit={handleAddComment} className="flex gap-2 pt-2 border-t border-white/10">
+                              <input
+                                type="text"
+                                value={newComment}
+                                onChange={(e) => setNewComment(e.target.value)}
+                                placeholder="Add a comment..."
+                                className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm"
+                              />
+                              <button
+                                type="submit"
+                                disabled={!newComment.trim()}
+                                className="px-3 py-2 rounded-lg bg-gradient-to-r from-pink-500 to-purple-500 text-white text-sm font-bold disabled:opacity-50"
+                              >
+                                <Send className="w-4 h-4" />
+                              </button>
+                            </form>
+                          </motion.div>
+                        )}
+                      </div>
                     </motion.div>
                   ))}
                 </div>
@@ -1769,37 +1930,103 @@ export default function AdminDashboard() {
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="glass-neon rounded-2xl p-8 max-w-md w-full"
+              className="glass-neon rounded-2xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
               <h2 className="text-2xl font-black text-white mb-6">Create Invoice</h2>
               <form onSubmit={handleCreateInvoice} className="space-y-4">
-                <div>
-                  <label className="block text-slate-400 text-sm mb-2">Client</label>
-                  <select name="client_id" required className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white">
-                    <option value="">Select client</option>
-                    {clients.map((c: Client) => (
-                      <option key={c.id} value={c.id}>{c.name} ({c.email})</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-slate-400 text-sm mb-2">Invoice Number</label>
-                  <input name="invoice_number" type="text" required placeholder="INV-003" className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" />
-                </div>
-                <div>
-                  <label className="block text-slate-400 text-sm mb-2">Amount (£)</label>
-                  <input name="amount" type="number" required min="0" className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" />
-                </div>
-                <div>
-                  <label className="block text-slate-400 text-sm mb-2">Status</label>
-                  <select name="status" required className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white">
-                    <option value="pending">Pending</option>
-                    <option value="paid">Paid</option>
-                    <option value="overdue">Overdue</option>
-                  </select>
-                </div>
                 <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-slate-400 text-sm mb-2">Client</label>
+                    <select name="client_id" required className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white">
+                      <option value="">Select client</option>
+                      {clients.map((c: Client) => (
+                        <option key={c.id} value={c.id}>{c.name} ({c.email})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 text-sm mb-2">Invoice Number</label>
+                    <input name="invoice_number" type="text" required placeholder="INV-003" className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" />
+                  </div>
+                </div>
+
+                {/* Line Items Section */}
+                <div className="border-t border-white/10 pt-4 mt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-slate-400 text-sm">Line Items</label>
+                    <button 
+                      type="button"
+                      onClick={addInvoiceItem}
+                      className="text-sm text-slap-cyan hover:underline flex items-center gap-1"
+                    >
+                      <Plus className="w-4 h-4" /> Add Item
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    {invoiceItems.map((item, index) => (
+                      <div key={index} className="flex gap-2 items-start">
+                        <input
+                          type="text"
+                          placeholder="Description"
+                          value={item.description}
+                          onChange={(e) => updateInvoiceItem(index, 'description', e.target.value)}
+                          className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm"
+                        />
+                        <input
+                          type="number"
+                          placeholder="Qty"
+                          min="1"
+                          value={item.quantity}
+                          onChange={(e) => updateInvoiceItem(index, 'quantity', parseInt(e.target.value) || 1)}
+                          className="w-20 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm"
+                        />
+                        <input
+                          type="number"
+                          placeholder="Rate £"
+                          min="0"
+                          step="0.01"
+                          value={item.rate}
+                          onChange={(e) => updateInvoiceItem(index, 'rate', parseFloat(e.target.value) || 0)}
+                          className="w-24 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm"
+                        />
+                        <div className="w-20 px-3 py-2 rounded-lg bg-white/10 text-white text-sm text-center">
+                          £{(item.quantity * item.rate).toFixed(2)}
+                        </div>
+                        {invoiceItems.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeInvoiceItem(index)}
+                            className="p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-red-400"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* Total */}
+                  <div className="flex justify-end pt-3 border-t border-white/10 mt-3">
+                    <div className="text-right">
+                      <span className="text-slate-400 text-sm">Total: </span>
+                      <span className="text-xl font-bold text-white">
+                        £{invoiceItems.reduce((sum, item) => sum + (item.quantity * item.rate), 0).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-slate-400 text-sm mb-2">Status</label>
+                    <select name="status" required className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white">
+                      <option value="pending">Pending</option>
+                      <option value="paid">Paid</option>
+                      <option value="overdue">Overdue</option>
+                    </select>
+                  </div>
                   <div>
                     <label className="block text-slate-400 text-sm mb-2">Date</label>
                     <input name="date" type="date" required className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" />
@@ -1810,11 +2037,18 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                 <div className="flex gap-4 pt-4">
-                  <button type="button" onClick={() => setShowInvoiceModal(false)} className="flex-1 px-4 py-3 rounded-xl bg-white/5 text-white font-bold hover:bg-white/10">
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      setShowInvoiceModal(false)
+                      setInvoiceItems([{ description: '', quantity: 1, rate: 0 }])
+                    }} 
+                    className="flex-1 px-4 py-3 rounded-xl bg-white/5 text-white font-bold hover:bg-white/10"
+                  >
                     Cancel
                   </button>
                   <button type="submit" className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold">
-                    Create
+                    Create Invoice
                   </button>
                 </div>
               </form>
