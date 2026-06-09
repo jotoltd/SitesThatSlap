@@ -49,6 +49,8 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true)
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
   const [showProjectModal, setShowProjectModal] = useState(false)
+  const [editingProject, setEditingProject] = useState<Project | null>(null)
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null)
 
   useEffect(() => {
     fetchData()
@@ -117,6 +119,44 @@ export default function AdminDashboard() {
     fetchData()
   }
 
+  const handleEditProject = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingProject) return
+    const form = e.target as HTMLFormElement
+    const formData = new FormData(form)
+
+    const updates = {
+      name: formData.get('name') as string,
+      description: formData.get('description') as string,
+      status: formData.get('status') as 'in_progress' | 'review' | 'completed' | 'on_hold',
+      progress: Number(formData.get('progress')),
+      deadline: formData.get('deadline') as string
+    }
+
+    await supabase.from('projects').update(updates).eq('id', editingProject.id)
+    setEditingProject(null)
+    fetchData()
+  }
+
+  const handleEditInvoice = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingInvoice) return
+    const form = e.target as HTMLFormElement
+    const formData = new FormData(form)
+
+    const updates = {
+      invoice_number: formData.get('invoice_number') as string,
+      amount: Number(formData.get('amount')),
+      status: formData.get('status') as 'paid' | 'pending' | 'overdue',
+      date: formData.get('date') as string,
+      due_date: formData.get('due_date') as string
+    }
+
+    await supabase.from('invoices').update(updates).eq('id', editingInvoice.id)
+    setEditingInvoice(null)
+    fetchData()
+  }
+
   const handleLogout = () => {
     logout()
     window.location.href = '/login'
@@ -129,6 +169,23 @@ export default function AdminDashboard() {
     totalClients: clients.length,
     activeProjects: projects.filter((p: Project) => p.status === 'in_progress').length,
   }
+
+  // Filter data based on search term
+  const searchLower = searchTerm.toLowerCase()
+  const filteredClients = clients.filter((c: Client) => 
+    c.name.toLowerCase().includes(searchLower) || 
+    c.email.toLowerCase().includes(searchLower)
+  )
+  const filteredInvoices = invoices.filter((i: Invoice) => 
+    i.invoice_number.toLowerCase().includes(searchLower) ||
+    i.client?.name?.toLowerCase().includes(searchLower) ||
+    i.client?.email?.toLowerCase().includes(searchLower)
+  )
+  const filteredProjects = projects.filter((p: Project) => 
+    p.name.toLowerCase().includes(searchLower) ||
+    p.description?.toLowerCase().includes(searchLower) ||
+    p.client?.name?.toLowerCase().includes(searchLower)
+  )
 
   return (
     <div className="min-h-screen bg-[#07070f]">
@@ -146,6 +203,25 @@ export default function AdminDashboard() {
               </div>
             </div>
             <div className="flex items-center gap-2 md:gap-4">
+              {/* Search */}
+              <div className="hidden md:flex items-center gap-2">
+                <Search className="w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search..."
+                  className="w-40 lg:w-56 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-pink-500/50"
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm('')}
+                    className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
               <button onClick={() => setShowProjectModal(true)} className="hidden md:flex p-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-bold text-sm items-center gap-2">
                 <Plus className="w-4 h-4" /> <span className="hidden sm:inline">New Project</span>
               </button>
@@ -294,10 +370,10 @@ export default function AdminDashboard() {
                     <div className="text-center py-8">
                       <Loader2 className="w-8 h-8 text-pink-500 animate-spin mx-auto" />
                     </div>
-                  ) : invoices.length === 0 ? (
+                  ) : filteredInvoices.length === 0 ? (
                     <p className="text-slate-400 text-center py-8">No invoices yet</p>
                   ) : (
-                    invoices.slice(0, 5).map((invoice: Invoice) => (
+                    filteredInvoices.slice(0, 5).map((invoice: Invoice) => (
                       <div key={invoice.id} className="flex items-center justify-between p-4 rounded-xl bg-white/5">
                         <div className="flex items-center gap-4">
                           <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
@@ -380,10 +456,10 @@ export default function AdminDashboard() {
                       <tr><td colSpan={6} className="text-center py-8">
                         <Loader2 className="w-8 h-8 text-pink-500 animate-spin mx-auto" />
                       </td></tr>
-                    ) : invoices.length === 0 ? (
+                    ) : filteredInvoices.length === 0 ? (
                       <tr><td colSpan={6} className="text-center py-8 text-slate-400">No invoices yet</td></tr>
                     ) : (
-                      invoices.map((invoice: Invoice) => (
+                      filteredInvoices.map((invoice: Invoice) => (
                         <tr key={invoice.id} className="border-b border-white/5 last:border-0 hover:bg-white/5">
                           <td className="p-4 text-white font-bold">{invoice.invoice_number}</td>
                           <td className="p-4 text-slate-300">{invoice.client?.name || 'Unknown'}</td>
@@ -400,13 +476,13 @@ export default function AdminDashboard() {
                           <td className="p-4 text-slate-400 text-sm">{invoice.date}</td>
                           <td className="p-4">
                             <div className="flex gap-2">
-                              <button className="p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white">
+                              <button onClick={() => setEditingInvoice(invoice)} className="p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white" title="Edit invoice">
                                 <Edit2 className="w-4 h-4" />
                               </button>
-                              <button onClick={() => handleDeleteInvoice(invoice.id)} className="p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-red-400">
+                              <button onClick={() => handleDeleteInvoice(invoice.id)} className="p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-red-400" title="Delete invoice">
                                 <Trash2 className="w-4 h-4" />
                               </button>
-                              <button className="p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white">
+                              <button className="p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white" title="Send invoice">
                                 <Send className="w-4 h-4" />
                               </button>
                             </div>
@@ -428,11 +504,11 @@ export default function AdminDashboard() {
                 <div className="text-center py-8">
                   <Loader2 className="w-8 h-8 text-pink-500 animate-spin mx-auto" />
                 </div>
-              ) : clients.length === 0 ? (
+              ) : filteredClients.length === 0 ? (
                 <p className="text-slate-400 text-center py-8">No clients yet</p>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {clients.map((client: Client) => (
+                  {filteredClients.map((client: Client) => (
                     <motion.div
                       key={client.id}
                       initial={{ opacity: 0, scale: 0.95 }}
@@ -460,11 +536,11 @@ export default function AdminDashboard() {
                 <div className="text-center py-8">
                   <Loader2 className="w-8 h-8 text-pink-500 animate-spin mx-auto" />
                 </div>
-              ) : projects.length === 0 ? (
+              ) : filteredProjects.length === 0 ? (
                 <p className="text-slate-400 text-center py-8">No projects yet</p>
               ) : (
                 <div className="space-y-4">
-                  {projects.map((project: Project) => (
+                  {filteredProjects.map((project: Project) => (
                     <motion.div
                       key={project.id}
                       initial={{ opacity: 0, y: 20 }}
@@ -484,6 +560,13 @@ export default function AdminDashboard() {
                           }`}>
                             {project.status.replace('_', ' ')}
                           </span>
+                          <button
+                            onClick={() => setEditingProject(project)}
+                            className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                            title="Edit project"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
                           <button
                             onClick={() => handleDeleteProject(project.id)}
                             className="p-1.5 rounded-lg hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-colors"
@@ -637,6 +720,119 @@ export default function AdminDashboard() {
                   </button>
                   <button type="submit" className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-bold">
                     Create
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* Edit Invoice Modal */}
+        {editingInvoice && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+            onClick={() => setEditingInvoice(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="glass-neon rounded-2xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 className="text-2xl font-black text-white mb-6">Edit Invoice</h2>
+              <form onSubmit={handleEditInvoice} className="space-y-4">
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Invoice Number</label>
+                  <input name="invoice_number" type="text" required defaultValue={editingInvoice.invoice_number} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" />
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Amount (£)</label>
+                  <input name="amount" type="number" required min="0" defaultValue={editingInvoice.amount} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" />
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Status</label>
+                  <select name="status" required defaultValue={editingInvoice.status} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white">
+                    <option value="pending">Pending</option>
+                    <option value="paid">Paid</option>
+                    <option value="overdue">Overdue</option>
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-slate-400 text-sm mb-2">Date</label>
+                    <input name="date" type="date" required defaultValue={editingInvoice.date} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 text-sm mb-2">Due Date</label>
+                    <input name="due_date" type="date" required defaultValue={editingInvoice.due_date} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" />
+                  </div>
+                </div>
+                <div className="flex gap-4 pt-4">
+                  <button type="button" onClick={() => setEditingInvoice(null)} className="flex-1 px-4 py-3 rounded-xl bg-white/5 text-white font-bold hover:bg-white/10">
+                    Cancel
+                  </button>
+                  <button type="submit" className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold">
+                    Save
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* Edit Project Modal */}
+        {editingProject && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+            onClick={() => setEditingProject(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="glass-neon rounded-2xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 className="text-2xl font-black text-white mb-6">Edit Project</h2>
+              <form onSubmit={handleEditProject} className="space-y-4">
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Project Name</label>
+                  <input name="name" type="text" required defaultValue={editingProject.name} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" />
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Description</label>
+                  <textarea name="description" rows={3} defaultValue={editingProject.description} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white resize-none" />
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Status</label>
+                  <select name="status" required defaultValue={editingProject.status} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white">
+                    <option value="in_progress">In Progress</option>
+                    <option value="review">In Review</option>
+                    <option value="completed">Completed</option>
+                    <option value="on_hold">On Hold</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Progress (%)</label>
+                  <input name="progress" type="number" required min="0" max="100" defaultValue={editingProject.progress} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" />
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Deadline</label>
+                  <input name="deadline" type="date" required defaultValue={editingProject.deadline} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" />
+                </div>
+                <div className="flex gap-4 pt-4">
+                  <button type="button" onClick={() => setEditingProject(null)} className="flex-1 px-4 py-3 rounded-xl bg-white/5 text-white font-bold hover:bg-white/10">
+                    Cancel
+                  </button>
+                  <button type="submit" className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-bold">
+                    Save
                   </button>
                 </div>
               </form>

@@ -84,9 +84,24 @@ export default function ClientDashboard() {
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           {[
-            { label: 'Active Projects', value: '2', icon: CheckCircle2, color: 'text-green-400' },
-            { label: 'Pending Invoices', value: '£1,800', icon: Clock, color: 'text-yellow-400' },
-            { label: 'Total Spent', value: '£4,300', icon: CreditCard, color: 'text-cyan-400' },
+            { 
+              label: 'Active Projects', 
+              value: projects.filter((p: Project) => ['in_progress', 'review'].includes(p.status)).length.toString(), 
+              icon: CheckCircle2, 
+              color: 'text-green-400' 
+            },
+            { 
+              label: 'Pending Invoices', 
+              value: '£' + invoices.filter((i: Invoice) => i.status === 'pending').reduce((sum: number, i: Invoice) => sum + i.amount, 0).toLocaleString(), 
+              icon: Clock, 
+              color: 'text-yellow-400' 
+            },
+            { 
+              label: 'Total Spent', 
+              value: '£' + invoices.filter((i: Invoice) => i.status === 'paid').reduce((sum: number, i: Invoice) => sum + i.amount, 0).toLocaleString(), 
+              icon: CreditCard, 
+              color: 'text-cyan-400' 
+            },
           ].map((stat, i) => (
             <motion.div
               key={i}
