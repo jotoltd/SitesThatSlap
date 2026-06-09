@@ -341,6 +341,82 @@ export default function AdminDashboard() {
     doc.save(`${invoice.invoice_number}.pdf`)
   }
 
+  const handleExportCSV = (type: 'invoices' | 'clients' | 'projects') => {
+    let data: any[] = []
+    let headers: string[] = []
+    let filename = ''
+
+    switch (type) {
+      case 'invoices':
+        data = filteredInvoices.map(inv => ({
+          'Invoice Number': inv.invoice_number,
+          'Client': inv.client?.name || 'Unknown',
+          'Email': inv.client?.email || '',
+          'Amount': inv.amount,
+          'Status': inv.status,
+          'Date': inv.date,
+          'Due Date': inv.due_date
+        }))
+        headers = ['Invoice Number', 'Client', 'Email', 'Amount', 'Status', 'Date', 'Due Date']
+        filename = 'invoices.csv'
+        break
+      case 'clients':
+        data = filteredClients.map(client => ({
+          'Name': client.name,
+          'Email': client.email,
+          'Company': client.company_name || '',
+          'Phone': client.phone || '',
+          'Address': client.address || '',
+          'Website': client.website || '',
+          'Notes': client.notes || '',
+          'Created': client.created_at
+        }))
+        headers = ['Name', 'Email', 'Company', 'Phone', 'Address', 'Website', 'Notes', 'Created']
+        filename = 'clients.csv'
+        break
+      case 'projects':
+        data = filteredProjects.map(proj => ({
+          'Name': proj.name,
+          'Client': proj.client?.name || 'Unknown',
+          'Status': proj.status,
+          'Progress': proj.progress + '%',
+          'Deadline': proj.deadline,
+          'Description': proj.description
+        }))
+        headers = ['Name', 'Client', 'Status', 'Progress', 'Deadline', 'Description']
+        filename = 'projects.csv'
+        break
+    }
+
+    if (data.length === 0) {
+      toast.error('No data to export')
+      return
+    }
+
+    // Create CSV content
+    const csvContent = [
+      headers.join(','),
+      ...data.map(row => headers.map(h => {
+        const val = row[h]?.toString() || ''
+        // Escape quotes and wrap in quotes if contains comma
+        return val.includes(',') || val.includes('"') ? `"${val.replace(/"/g, '""')}"` : val
+      }).join(','))
+    ].join('\n')
+
+    // Download
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+
+    toast.success(`${type} exported to CSV`)
+  }
+
   const handleCreateInvoice = async (e: React.FormEvent) => {
     e.preventDefault()
     const form = e.target as HTMLFormElement
@@ -923,7 +999,10 @@ export default function AdminDashboard() {
                 <button className="px-4 py-3 rounded-xl glass-neon text-slate-400 flex items-center gap-2">
                   <Filter className="w-5 h-5" /> Filter
                 </button>
-                <button className="px-4 py-3 rounded-xl glass-neon text-slate-400 flex items-center gap-2">
+                <button 
+                  onClick={() => handleExportCSV('invoices')}
+                  className="px-4 py-3 rounded-xl glass-neon text-slate-400 flex items-center gap-2 hover:text-white"
+                >
                   <Download className="w-5 h-5" /> Export
                 </button>
               </div>
@@ -995,12 +1074,20 @@ export default function AdminDashboard() {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <h1 className="text-3xl font-black text-white">Clients</h1>
-                <button 
-                  onClick={() => setShowClientModal(true)}
-                  className="px-6 py-3 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold flex items-center gap-2"
-                >
-                  <Plus className="w-5 h-5" /> Add Client
-                </button>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => handleExportCSV('clients')}
+                    className="px-4 py-3 rounded-xl glass-neon text-slate-400 font-bold flex items-center gap-2 hover:text-white"
+                  >
+                    <Download className="w-5 h-5" /> Export
+                  </button>
+                  <button 
+                    onClick={() => setShowClientModal(true)}
+                    className="px-6 py-3 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold flex items-center gap-2"
+                  >
+                    <Plus className="w-5 h-5" /> Add Client
+                  </button>
+                </div>
               </div>
               {loading ? (
                 <div className="text-center py-8">
@@ -1081,7 +1168,15 @@ export default function AdminDashboard() {
 
           {activeTab === 'projects' && (
             <div className="space-y-6">
-              <h1 className="text-3xl font-black text-white">Projects</h1>
+              <div className="flex items-center justify-between">
+                <h1 className="text-3xl font-black text-white">Projects</h1>
+                <button 
+                  onClick={() => handleExportCSV('projects')}
+                  className="px-4 py-3 rounded-xl glass-neon text-slate-400 font-bold flex items-center gap-2 hover:text-white"
+                >
+                  <Download className="w-5 h-5" /> Export
+                </button>
+              </div>
               {loading ? (
                 <div className="text-center py-8">
                   <Loader2 className="w-8 h-8 text-pink-500 animate-spin mx-auto" />
