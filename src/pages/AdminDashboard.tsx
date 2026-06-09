@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase'
 import { 
   Users, FileText, Plus, LogOut, DollarSign, TrendingUp,
   CheckCircle, XCircle, Clock, Send, Trash2, Edit2,
-  Search, Filter, Download, Menu, X, Loader2
+  Search, Filter, Download, Menu, X, Loader2, MessageSquare
 } from 'lucide-react'
 
 interface Client {
@@ -38,19 +38,32 @@ interface Project {
   client?: Client
 }
 
+interface Message {
+  id: string
+  client_id: string
+  sender: 'client' | 'admin'
+  content: string
+  read: boolean
+  created_at: string
+  client?: Client
+}
+
 export default function AdminDashboard() {
   const { user, logout } = useAuth()
-  const [activeTab, setActiveTab] = useState<'overview' | 'clients' | 'invoices' | 'projects'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'clients' | 'invoices' | 'projects' | 'messages'>('overview')
   const [searchTerm, setSearchTerm] = useState('')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [clients, setClients] = useState<Client[]>([])
   const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [messages, setMessages] = useState<Message[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
   const [showProjectModal, setShowProjectModal] = useState(false)
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null)
+  const [selectedClientForMessages, setSelectedClientForMessages] = useState<string | null>(null)
+  const [newAdminMessage, setNewAdminMessage] = useState('')
 
   useEffect(() => {
     fetchData()
@@ -58,16 +71,33 @@ export default function AdminDashboard() {
 
   const fetchData = async () => {
     setLoading(true)
-    const [{ data: clientsData }, { data: invoicesData }, { data: projectsData }] = await Promise.all([
+    const [{ data: clientsData }, { data: invoicesData }, { data: projectsData }, { data: messagesData }] = await Promise.all([
       supabase.from('profiles').select('*').eq('role', 'client').order('created_at', { ascending: false }),
       supabase.from('invoices').select('*, client:profiles(name, email)').order('created_at', { ascending: false }),
-      supabase.from('projects').select('*, client:profiles(name, email)').order('created_at', { ascending: false })
+      supabase.from('projects').select('*, client:profiles(name, email)').order('created_at', { ascending: false }),
+      supabase.from('messages').select('*, client:profiles(name, email)').order('created_at', { ascending: true })
     ])
     setClients(clientsData || [])
     setInvoices(invoicesData || [])
     setProjects(projectsData || [])
+    setMessages(messagesData || [])
     setLoading(false)
   }
+
+  const handleSendAdminMessage = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newAdminMessage.trim() || !selectedClientForMessages) return
+    
+    await supabase.from('messages').insert({
+      client_id: selectedClientForMessages,
+      sender: 'admin',
+      content: newAdminMessage.trim()
+    })
+    setNewAdminMessage('')
+    fetchData()
+  }
+
+  const unreadCount = messages.filter((m: Message) => m.sender === 'client' && !m.read).length
 
   const handleDeleteInvoice = async (id: string) => {
     if (!confirm('Delete this invoice?')) return
@@ -265,6 +295,7 @@ export default function AdminDashboard() {
                 { id: 'clients', label: 'Clients', icon: Users },
                 { id: 'invoices', label: 'Invoices', icon: FileText },
                 { id: 'projects', label: 'Projects', icon: CheckCircle },
+                { id: 'messages', label: 'Messages', icon: MessageSquare, badge: unreadCount },
               ].map((item, i) => (
                 <motion.button
                   key={item.id}
@@ -282,7 +313,12 @@ export default function AdminDashboard() {
                   }`}
                 >
                   <item.icon className="w-5 h-5" />
-                  {item.label}
+                  <span className="flex-1 text-left">{item.label}</span>
+                  {(item as any).badge > 0 && (
+                    <span className="px-2 py-0.5 rounded-full bg-pink-500 text-white text-xs font-bold">
+                      {(item as any).badge}
+                    </span>
+                  )}
                 </motion.button>
               ))}
               <div className="pt-4 border-t border-white/10 space-y-2">
@@ -308,6 +344,7 @@ export default function AdminDashboard() {
               { id: 'clients', label: 'Clients', icon: Users },
               { id: 'invoices', label: 'Invoices', icon: FileText },
               { id: 'projects', label: 'Projects', icon: CheckCircle },
+              { id: 'messages', label: 'Messages', icon: MessageSquare, badge: unreadCount },
             ].map((item) => (
               <button
                 key={item.id}
@@ -319,7 +356,12 @@ export default function AdminDashboard() {
                 }`}
               >
                 <item.icon className="w-5 h-5" />
-                {item.label}
+                <span className="flex-1 text-left">{item.label}</span>
+                {(item as any).badge > 0 && (
+                  <span className="px-2 py-0.5 rounded-full bg-pink-500 text-white text-xs font-bold">
+                    {(item as any).badge}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -588,6 +630,149 @@ export default function AdminDashboard() {
                       </div>
                     </motion.div>
                   ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'messages' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h1 className="text-3xl font-black text-white">Messages</h1>
+                {unreadCount > 0 && (
+                  <span className="px-3 py-1 rounded-full bg-pink-500/20 text-pink-400 text-sm font-bold">
+                    {unreadCount} unread
+                  </span>
+                )}
+              </div>
+
+              {loading ? (
+                <div className="text-center py-8">
+                  <Loader2 className="w-8 h-8 text-pink-500 animate-spin mx-auto" />
+                </div>
+              ) : clients.length === 0 ? (
+                <p className="text-slate-400 text-center py-8">No clients to message</p>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-240px)]">
+                  {/* Client List */}
+                  <div className="glass-neon rounded-2xl p-4 overflow-y-auto">
+                    <h2 className="text-lg font-bold text-white mb-4">Clients</h2>
+                    <div className="space-y-2">
+                      {clients.map((client: Client) => {
+                        const clientMessages = messages.filter((m: Message) => m.client_id === client.id)
+                        const unreadClient = clientMessages.filter((m: Message) => m.sender === 'client' && !m.read).length
+                        const lastMessage = clientMessages[clientMessages.length - 1]
+                        
+                        return (
+                          <button
+                            key={client.id}
+                            onClick={() => setSelectedClientForMessages(client.id)}
+                            className={`w-full p-3 rounded-xl text-left transition-all ${
+                              selectedClientForMessages === client.id
+                                ? 'bg-gradient-to-r from-pink-500/20 to-purple-500/20 border border-pink-500/30'
+                                : 'hover:bg-white/5'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-semibold text-white">{client.name}</span>
+                              {unreadClient > 0 && (
+                                <span className="px-2 py-0.5 rounded-full bg-pink-500 text-white text-xs font-bold">
+                                  {unreadClient}
+                                </span>
+                              )}
+                            </div>
+                            {lastMessage && (
+                              <p className="text-sm text-slate-400 truncate mt-1">
+                                {lastMessage.content}
+                              </p>
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Chat Area */}
+                  <div className="lg:col-span-2 glass-neon rounded-2xl p-4 flex flex-col">
+                    {selectedClientForMessages ? (
+                      <>
+                        {/* Chat Header */}
+                        <div className="flex items-center justify-between pb-4 border-b border-white/10">
+                          <div>
+                            <h2 className="font-bold text-white">
+                              {clients.find((c: Client) => c.id === selectedClientForMessages)?.name}
+                            </h2>
+                            <p className="text-sm text-slate-400">
+                              {clients.find((c: Client) => c.id === selectedClientForMessages)?.email}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => setSelectedClientForMessages(null)}
+                            className="p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white"
+                          >
+                            <X className="w-5 h-5" />
+                          </button>
+                        </div>
+
+                        {/* Messages */}
+                        <div className="flex-1 overflow-y-auto py-4 space-y-4 my-4">
+                          {messages
+                            .filter((m: Message) => m.client_id === selectedClientForMessages)
+                            .map((message: Message) => (
+                              <motion.div
+                                key={message.id}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className={`flex ${message.sender === 'admin' ? 'justify-end' : 'justify-start'}`}
+                              >
+                                <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                                  message.sender === 'admin' 
+                                    ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-br-md' 
+                                    : 'bg-white/10 text-white rounded-bl-md'
+                                }`}>
+                                  <p>{message.content}</p>
+                                  <p className={`text-xs mt-1 ${message.sender === 'admin' ? 'text-white/70' : 'text-slate-400'}`}>
+                                    {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  </p>
+                                </div>
+                              </motion.div>
+                            ))}
+                          {messages.filter((m: Message) => m.client_id === selectedClientForMessages).length === 0 && (
+                            <div className="text-center py-12">
+                              <MessageSquare className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                              <p className="text-slate-400">No messages yet</p>
+                              <p className="text-slate-500 text-sm mt-1">Start the conversation</p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Input */}
+                        <form onSubmit={handleSendAdminMessage} className="flex gap-2 pt-4 border-t border-white/10">
+                          <input
+                            type="text"
+                            value={newAdminMessage}
+                            onChange={(e) => setNewAdminMessage(e.target.value)}
+                            placeholder="Type a message..."
+                            className="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-pink-500/50"
+                          />
+                          <button
+                            type="submit"
+                            disabled={!newAdminMessage.trim()}
+                            className="px-4 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold disabled:opacity-50"
+                          >
+                            <Send className="w-5 h-5" />
+                          </button>
+                        </form>
+                      </>
+                    ) : (
+                      <div className="flex-1 flex items-center justify-center">
+                        <div className="text-center">
+                          <MessageSquare className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                          <p className="text-slate-400">Select a client to view messages</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

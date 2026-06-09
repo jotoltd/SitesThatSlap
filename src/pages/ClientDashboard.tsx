@@ -4,7 +4,7 @@ import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
 import { 
   FileText, CreditCard, MessageSquare, CheckCircle2, 
-  Clock, Download, LogOut, User, Loader2
+  Clock, Download, LogOut, User, Loader2, Send
 } from 'lucide-react'
 
 interface Project {
@@ -25,12 +25,24 @@ interface Invoice {
   due_date: string
 }
 
+interface Message {
+  id: string
+  client_id: string
+  sender: 'client' | 'admin'
+  content: string
+  read: boolean
+  created_at: string
+}
+
 export default function ClientDashboard() {
   const { user, logout } = useAuth()
   const [activeTab, setActiveTab] = useState<'projects' | 'invoices' | 'messages'>('projects')
   const [projects, setProjects] = useState<Project[]>([])
   const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [messages, setMessages] = useState<Message[]>([])
+  const [newMessage, setNewMessage] = useState('')
   const [loading, setLoading] = useState(true)
+  const [payingInvoice, setPayingInvoice] = useState<string | null>(null)
 
   useEffect(() => {
     if (user) {
@@ -40,13 +52,61 @@ export default function ClientDashboard() {
 
   const fetchData = async () => {
     setLoading(true)
-    const [{ data: projectsData }, { data: invoicesData }] = await Promise.all([
+    const [{ data: projectsData }, { data: invoicesData }, { data: messagesData }] = await Promise.all([
       supabase.from('projects').select('*').eq('client_id', user?.id).order('created_at', { ascending: false }),
-      supabase.from('invoices').select('*').eq('client_id', user?.id).order('created_at', { ascending: false })
+      supabase.from('invoices').select('*').eq('client_id', user?.id).order('created_at', { ascending: false }),
+      supabase.from('messages').select('*').eq('client_id', user?.id).order('created_at', { ascending: true })
     ])
     setProjects(projectsData || [])
     setInvoices(invoicesData || [])
+    setMessages(messagesData || [])
     setLoading(false)
+  }
+
+  const handlePayInvoice = async (invoiceId: string) => {
+    setPayingInvoice(invoiceId)
+    await supabase.from('invoices').update({ status: 'paid' }).eq('id', invoiceId)
+    await fetchData()
+    setPayingInvoice(null)
+  }
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newMessage.trim() || !user) return
+    
+    await supabase.from('messages').insert({
+      client_id: user.id,
+      sender: 'client',
+      content: newMessage.trim()
+    })
+    setNewMessage('')
+    fetchData()
+  }
+
+  const handleDownloadInvoice = (invoice: Invoice) => {
+    // Generate simple PDF-like text and download
+    const content = `
+INVOICE
+=======
+Invoice #: ${invoice.invoice_number}
+Date: ${invoice.date}
+Due Date: ${invoice.due_date}
+Status: ${invoice.status.toUpperCase()}
+
+Amount: £${invoice.amount.toLocaleString()}
+
+Thank you for your business!
+    `.trim()
+    
+    const blob = new Blob([content], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${invoice.invoice_number}.txt`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
   }
 
   const handleLogout = () => {
@@ -218,12 +278,20 @@ export default function ClientDashboard() {
                           {invoice.status}
                         </span>
                         {invoice.status === 'paid' ? (
-                          <button className="text-slate-400 hover:text-white">
+                          <button 
+                            onClick={() => handleDownloadInvoice(invoice)}
+                            className="text-slate-400 hover:text-white"
+                            title="Download invoice"
+                          >
                             <Download className="w-4 h-4" />
                           </button>
                         ) : (
-                          <button className="px-3 py-1 rounded-lg bg-gradient-to-r from-pink-500 to-purple-500 text-white text-xs font-bold">
-                            Pay Now
+                          <button 
+                            onClick={() => handlePayInvoice(invoice.id)}
+                            disabled={payingInvoice === invoice.id}
+                            className="px-3 py-1 rounded-lg bg-gradient-to-r from-pink-500 to-purple-500 text-white text-xs font-bold disabled:opacity-50"
+                          >
+                            {payingInvoice === invoice.id ? 'Processing...' : 'Pay Now'}
                           </button>
                         )}
                       </div>
@@ -235,12 +303,64 @@ export default function ClientDashboard() {
           )}
 
           {activeTab === 'messages' && (
-            <div className="text-center py-12">
-              <MessageSquare className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-              <p className="text-slate-400">No new messages</p>
-              <button className="mt-4 px-6 py-3 rounded-xl bg-white/5 text-white font-semibold hover:bg-white/10 transition-colors">
-                Start a Conversation
-              </button>
+            <div className="flex flex-col h-[calc(100vh-280px)]">
+              <h2 className="text-xl font-bold text-white mb-4">Messages</h2>
+              
+              {/* Messages List */}
+              <div className="flex-1 overflow-y-auto space-y-4 mb-4 pr-2">
+                {loading ? (
+                  <div className="text-center py-8">
+                    <Loader2 className="w-8 h-8 text-pink-500 animate-spin mx-auto" />
+                  </div>
+                ) : messages.length === 0 ? (
+                  <div className="text-center py-12">
+                    <MessageSquare className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                    <p className="text-slate-400">No messages yet</p>
+                    <p className="text-slate-500 text-sm mt-2">Send a message to start the conversation</p>
+                  </div>
+                ) : (
+                  messages.map((message: Message) => (
+                    <motion.div
+                      key={message.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={`flex ${message.sender === 'client' ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                        message.sender === 'client' 
+                          ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-br-md' 
+                          : 'bg-white/10 text-white rounded-bl-md'
+                      }`}>
+                        <p>{message.content}</p>
+                        <p className={`text-xs mt-1 ${message.sender === 'client' ? 'text-white/70' : 'text-slate-400'}`}>
+                          {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {message.sender === 'admin' && !message.read && (
+                            <span className="ml-2 text-pink-400">• New</span>
+                          )}
+                        </p>
+                      </div>
+                    </motion.div>
+                  ))
+                )}
+              </div>
+
+              {/* Message Input */}
+              <form onSubmit={handleSendMessage} className="flex gap-2">
+                <input
+                  type="text"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  placeholder="Type a message..."
+                  className="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-pink-500/50"
+                />
+                <button
+                  type="submit"
+                  disabled={!newMessage.trim()}
+                  className="px-4 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold disabled:opacity-50"
+                >
+                  <Send className="w-5 h-5" />
+                </button>
+              </form>
             </div>
           )}
         </div>
