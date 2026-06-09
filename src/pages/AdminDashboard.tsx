@@ -1,37 +1,95 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../lib/auth'
+import { supabase } from '../lib/supabase'
 import { 
   Users, FileText, Plus, LogOut, DollarSign, TrendingUp,
   CheckCircle, XCircle, Clock, Send, Trash2, Edit2,
-  Search, Filter, Download, Menu, X
+  Search, Filter, Download, Menu, X, Loader2
 } from 'lucide-react'
 
-// Mock admin data
-const MOCK_CLIENTS = [
-  { id: 1, name: 'John Client', email: 'client@example.com', company: 'Client Co', totalSpent: 4300, activeProjects: 2 },
-  { id: 2, name: 'Jane Smith', email: 'jane@techcorp.com', company: 'TechCorp', totalSpent: 8500, activeProjects: 1 },
-  { id: 3, name: 'Mike Johnson', email: 'mike@startup.io', company: 'StartupIO', totalSpent: 1200, activeProjects: 0 },
-]
+interface Client {
+  id: string
+  name: string
+  email: string
+  role: string
+  created_at: string
+}
 
-const MOCK_ALL_INVOICES = [
-  { id: 'INV-001', client: 'John Client', amount: 2500, status: 'paid', date: '2026-05-01', dueDate: '2026-05-15' },
-  { id: 'INV-002', client: 'John Client', amount: 1800, status: 'pending', date: '2026-05-15', dueDate: '2026-05-29' },
-  { id: 'INV-003', client: 'Jane Smith', amount: 4500, status: 'paid', date: '2026-04-20', dueDate: '2026-05-05' },
-  { id: 'INV-004', client: 'Jane Smith', amount: 4000, status: 'overdue', date: '2026-04-01', dueDate: '2026-04-15' },
-]
+interface Invoice {
+  id: string
+  invoice_number: string
+  client_id: string
+  amount: number
+  status: 'paid' | 'pending' | 'overdue'
+  date: string
+  due_date: string
+  client?: Client
+}
 
-const MOCK_PROJECTS = [
-  { id: 1, name: 'E-Commerce Platform', client: 'John Client', status: 'in_progress', budget: 5000, progress: 75 },
-  { id: 2, name: 'Mobile App Design', client: 'John Client', status: 'review', budget: 2000, progress: 90 },
-  { id: 3, name: 'SaaS Dashboard', client: 'Jane Smith', status: 'in_progress', budget: 8000, progress: 45 },
-]
+interface Project {
+  id: string
+  client_id: string
+  name: string
+  description: string
+  status: 'in_progress' | 'review' | 'completed' | 'on_hold'
+  progress: number
+  deadline: string
+  client?: Client
+}
 
 export default function AdminDashboard() {
   const { user, logout } = useAuth()
   const [activeTab, setActiveTab] = useState<'overview' | 'clients' | 'invoices' | 'projects'>('overview')
   const [searchTerm, setSearchTerm] = useState('')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [clients, setClients] = useState<Client[]>([])
+  const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false)
+
+  useEffect(() => {
+    fetchData()
+  }, [])
+
+  const fetchData = async () => {
+    setLoading(true)
+    const [{ data: clientsData }, { data: invoicesData }, { data: projectsData }] = await Promise.all([
+      supabase.from('profiles').select('*').eq('role', 'client').order('created_at', { ascending: false }),
+      supabase.from('invoices').select('*, client:profiles(name, email)').order('created_at', { ascending: false }),
+      supabase.from('projects').select('*, client:profiles(name, email)').order('created_at', { ascending: false })
+    ])
+    setClients(clientsData || [])
+    setInvoices(invoicesData || [])
+    setProjects(projectsData || [])
+    setLoading(false)
+  }
+
+  const handleDeleteInvoice = async (id: string) => {
+    if (!confirm('Delete this invoice?')) return
+    await supabase.from('invoices').delete().eq('id', id)
+    fetchData()
+  }
+
+  const handleCreateInvoice = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const form = e.target as HTMLFormElement
+    const formData = new FormData(form)
+    
+    const newInvoice = {
+      client_id: formData.get('client_id') as string,
+      invoice_number: formData.get('invoice_number') as string,
+      amount: Number(formData.get('amount')),
+      status: formData.get('status') as 'paid' | 'pending' | 'overdue',
+      date: formData.get('date') as string,
+      due_date: formData.get('due_date') as string
+    }
+    
+    await supabase.from('invoices').insert(newInvoice)
+    setShowInvoiceModal(false)
+    fetchData()
+  }
 
   const handleLogout = () => {
     logout()
@@ -39,11 +97,11 @@ export default function AdminDashboard() {
   }
 
   const stats = {
-    totalRevenue: MOCK_ALL_INVOICES.filter(i => i.status === 'paid').reduce((sum, i) => sum + i.amount, 0),
-    pendingAmount: MOCK_ALL_INVOICES.filter(i => i.status === 'pending').reduce((sum, i) => sum + i.amount, 0),
-    overdueAmount: MOCK_ALL_INVOICES.filter(i => i.status === 'overdue').reduce((sum, i) => sum + i.amount, 0),
-    totalClients: MOCK_CLIENTS.length,
-    activeProjects: MOCK_PROJECTS.filter(p => p.status === 'in_progress').length,
+    totalRevenue: invoices.filter((i: Invoice) => i.status === 'paid').reduce((sum: number, i: Invoice) => sum + i.amount, 0),
+    pendingAmount: invoices.filter((i: Invoice) => i.status === 'pending').reduce((sum: number, i: Invoice) => sum + i.amount, 0),
+    overdueAmount: invoices.filter((i: Invoice) => i.status === 'overdue').reduce((sum: number, i: Invoice) => sum + i.amount, 0),
+    totalClients: clients.length,
+    activeProjects: projects.filter((p: Project) => p.status === 'in_progress').length,
   }
 
   return (
@@ -62,7 +120,7 @@ export default function AdminDashboard() {
               </div>
             </div>
             <div className="flex items-center gap-2 md:gap-4">
-              <button className="hidden md:flex p-2 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold text-sm items-center gap-2">
+              <button onClick={() => setShowInvoiceModal(true)} className="hidden md:flex p-2 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold text-sm items-center gap-2">
                 <Plus className="w-4 h-4" /> <span className="hidden sm:inline">New Invoice</span>
               </button>
               <button onClick={handleLogout} className="p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors">
@@ -200,33 +258,41 @@ export default function AdminDashboard() {
               <div className="glass-neon rounded-2xl p-6">
                 <h2 className="text-xl font-bold text-white mb-4">Recent Invoices</h2>
                 <div className="space-y-3">
-                  {MOCK_ALL_INVOICES.slice(0, 5).map((invoice) => (
-                    <div key={invoice.id} className="flex items-center justify-between p-4 rounded-xl bg-white/5">
-                      <div className="flex items-center gap-4">
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                          invoice.status === 'paid' ? 'bg-green-500/20 text-green-400' :
-                          invoice.status === 'overdue' ? 'bg-red-500/20 text-red-400' :
-                          'bg-yellow-500/20 text-yellow-400'
-                        }`}>
-                          <FileText className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <p className="font-bold text-white">{invoice.id}</p>
-                          <p className="text-sm text-slate-400">{invoice.client}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-bold text-white">£{invoice.amount.toLocaleString()}</p>
-                        <span className={`text-xs px-2 py-1 rounded-full ${
-                          invoice.status === 'paid' ? 'bg-green-500/20 text-green-400' :
-                          invoice.status === 'overdue' ? 'bg-red-500/20 text-red-400' :
-                          'bg-yellow-500/20 text-yellow-400'
-                        }`}>
-                          {invoice.status}
-                        </span>
-                      </div>
+                  {loading ? (
+                    <div className="text-center py-8">
+                      <Loader2 className="w-8 h-8 text-pink-500 animate-spin mx-auto" />
                     </div>
-                  ))}
+                  ) : invoices.length === 0 ? (
+                    <p className="text-slate-400 text-center py-8">No invoices yet</p>
+                  ) : (
+                    invoices.slice(0, 5).map((invoice: Invoice) => (
+                      <div key={invoice.id} className="flex items-center justify-between p-4 rounded-xl bg-white/5">
+                        <div className="flex items-center gap-4">
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                            invoice.status === 'paid' ? 'bg-green-500/20 text-green-400' :
+                            invoice.status === 'overdue' ? 'bg-red-500/20 text-red-400' :
+                            'bg-yellow-500/20 text-yellow-400'
+                          }`}>
+                            <FileText className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <p className="font-bold text-white">{invoice.invoice_number}</p>
+                            <p className="text-sm text-slate-400">{invoice.client?.name || 'Unknown'}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-white">£{invoice.amount.toLocaleString()}</p>
+                          <span className={`text-xs px-2 py-1 rounded-full ${
+                            invoice.status === 'paid' ? 'bg-green-500/20 text-green-400' :
+                            invoice.status === 'overdue' ? 'bg-red-500/20 text-red-400' :
+                            'bg-yellow-500/20 text-yellow-400'
+                          }`}>
+                            {invoice.status}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </div>
@@ -278,36 +344,44 @@ export default function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {MOCK_ALL_INVOICES.map((invoice) => (
-                      <tr key={invoice.id} className="border-b border-white/5 last:border-0 hover:bg-white/5">
-                        <td className="p-4 text-white font-bold">{invoice.id}</td>
-                        <td className="p-4 text-slate-300">{invoice.client}</td>
-                        <td className="p-4 text-white font-bold">£{invoice.amount.toLocaleString()}</td>
-                        <td className="p-4">
-                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                            invoice.status === 'paid' ? 'bg-green-500/20 text-green-400' :
-                            invoice.status === 'overdue' ? 'bg-red-500/20 text-red-400' :
-                            'bg-yellow-500/20 text-yellow-400'
-                          }`}>
-                            {invoice.status}
-                          </span>
-                        </td>
-                        <td className="p-4 text-slate-400 text-sm">{invoice.date}</td>
-                        <td className="p-4">
-                          <div className="flex gap-2">
-                            <button className="p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white">
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                            <button className="p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-red-400">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                            <button className="p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white">
-                              <Send className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                    {loading ? (
+                      <tr><td colSpan={6} className="text-center py-8">
+                        <Loader2 className="w-8 h-8 text-pink-500 animate-spin mx-auto" />
+                      </td></tr>
+                    ) : invoices.length === 0 ? (
+                      <tr><td colSpan={6} className="text-center py-8 text-slate-400">No invoices yet</td></tr>
+                    ) : (
+                      invoices.map((invoice: Invoice) => (
+                        <tr key={invoice.id} className="border-b border-white/5 last:border-0 hover:bg-white/5">
+                          <td className="p-4 text-white font-bold">{invoice.invoice_number}</td>
+                          <td className="p-4 text-slate-300">{invoice.client?.name || 'Unknown'}</td>
+                          <td className="p-4 text-white font-bold">£{invoice.amount.toLocaleString()}</td>
+                          <td className="p-4">
+                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                              invoice.status === 'paid' ? 'bg-green-500/20 text-green-400' :
+                              invoice.status === 'overdue' ? 'bg-red-500/20 text-red-400' :
+                              'bg-yellow-500/20 text-yellow-400'
+                            }`}>
+                              {invoice.status}
+                            </span>
+                          </td>
+                          <td className="p-4 text-slate-400 text-sm">{invoice.date}</td>
+                          <td className="p-4">
+                            <div className="flex gap-2">
+                              <button className="p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white">
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button onClick={() => handleDeleteInvoice(invoice.id)} className="p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-red-400">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                              <button className="p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white">
+                                <Send className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -318,76 +392,152 @@ export default function AdminDashboard() {
           {activeTab === 'clients' && (
             <div className="space-y-6">
               <h1 className="text-3xl font-black text-white">Clients</h1>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {MOCK_CLIENTS.map((client) => (
-                  <motion.div
-                    key={client.id}
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="glass-neon rounded-2xl p-6"
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 flex items-center justify-center text-white font-bold text-xl">
-                        {client.name.charAt(0)}
+              {loading ? (
+                <div className="text-center py-8">
+                  <Loader2 className="w-8 h-8 text-pink-500 animate-spin mx-auto" />
+                </div>
+              ) : clients.length === 0 ? (
+                <p className="text-slate-400 text-center py-8">No clients yet</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {clients.map((client: Client) => (
+                    <motion.div
+                      key={client.id}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="glass-neon rounded-2xl p-6"
+                    >
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 flex items-center justify-center text-white font-bold text-xl">
+                          {client.name.charAt(0)}
+                        </div>
                       </div>
-                      <span className="text-xs px-2 py-1 rounded-full bg-white/10 text-slate-400">
-                        {client.activeProjects} projects
-                      </span>
-                    </div>
-                    <h3 className="font-bold text-white text-lg">{client.name}</h3>
-                    <p className="text-slate-400 text-sm">{client.company}</p>
-                    <p className="text-slate-500 text-xs mt-1">{client.email}</p>
-                    <div className="mt-4 pt-4 border-t border-white/10 flex items-center justify-between">
-                      <span className="text-slate-400 text-sm">Total Spent</span>
-                      <span className="text-xl font-black text-white">£{client.totalSpent.toLocaleString()}</span>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
+                      <h3 className="font-bold text-white text-lg">{client.name}</h3>
+                      <p className="text-slate-500 text-xs mt-1">{client.email}</p>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
           {activeTab === 'projects' && (
             <div className="space-y-6">
               <h1 className="text-3xl font-black text-white">Projects</h1>
-              <div className="space-y-4">
-                {MOCK_PROJECTS.map((project) => (
-                  <motion.div
-                    key={project.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="glass-neon rounded-2xl p-6"
-                  >
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <h3 className="font-bold text-white text-lg">{project.name}</h3>
-                        <p className="text-slate-400">{project.client}</p>
+              {loading ? (
+                <div className="text-center py-8">
+                  <Loader2 className="w-8 h-8 text-pink-500 animate-spin mx-auto" />
+                </div>
+              ) : projects.length === 0 ? (
+                <p className="text-slate-400 text-center py-8">No projects yet</p>
+              ) : (
+                <div className="space-y-4">
+                  {projects.map((project: Project) => (
+                    <motion.div
+                      key={project.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="glass-neon rounded-2xl p-6"
+                    >
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h3 className="font-bold text-white text-lg">{project.name}</h3>
+                          <p className="text-slate-400">{project.client?.name || 'Unknown'}</p>
+                        </div>
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                          project.status === 'in_progress' ? 'bg-blue-500/20 text-blue-400' :
+                          project.status === 'review' ? 'bg-purple-500/20 text-purple-400' :
+                          'bg-green-500/20 text-green-400'
+                        }`}>
+                          {project.status.replace('_', ' ')}
+                        </span>
                       </div>
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                        project.status === 'in_progress' ? 'bg-blue-500/20 text-blue-400' :
-                        project.status === 'review' ? 'bg-purple-500/20 text-purple-400' :
-                        'bg-green-500/20 text-green-400'
-                      }`}>
-                        {project.status.replace('_', ' ')}
-                      </span>
-                    </div>
-                    <div className="w-full h-2 bg-slate-700 rounded-full overflow-hidden mb-3">
-                      <div 
-                        className="h-full bg-gradient-to-r from-pink-500 to-cyan-500 rounded-full transition-all"
-                        style={{ width: `${project.progress}%` }}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-400">{project.progress}% Complete</span>
-                      <span className="text-slate-400">Budget: £{project.budget.toLocaleString()}</span>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
+                      <div className="w-full h-2 bg-slate-700 rounded-full overflow-hidden mb-3">
+                        <div 
+                          className="h-full bg-gradient-to-r from-pink-500 to-cyan-500 rounded-full transition-all"
+                          style={{ width: `${project.progress}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-slate-400">{project.progress}% Complete</span>
+                        <span className="text-slate-400">Due: {project.deadline}</span>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </main>
       </div>
+
+      {/* Create Invoice Modal */}
+      <AnimatePresence>
+        {showInvoiceModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+            onClick={() => setShowInvoiceModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="glass-neon rounded-2xl p-8 max-w-md w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 className="text-2xl font-black text-white mb-6">Create Invoice</h2>
+              <form onSubmit={handleCreateInvoice} className="space-y-4">
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Client</label>
+                  <select name="client_id" required className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white">
+                    <option value="">Select client</option>
+                    {clients.map((c: Client) => (
+                      <option key={c.id} value={c.id}>{c.name} ({c.email})</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Invoice Number</label>
+                  <input name="invoice_number" type="text" required placeholder="INV-003" className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" />
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Amount (£)</label>
+                  <input name="amount" type="number" required min="0" className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" />
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Status</label>
+                  <select name="status" required className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white">
+                    <option value="pending">Pending</option>
+                    <option value="paid">Paid</option>
+                    <option value="overdue">Overdue</option>
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-slate-400 text-sm mb-2">Date</label>
+                    <input name="date" type="date" required className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 text-sm mb-2">Due Date</label>
+                    <input name="due_date" type="date" required className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" />
+                  </div>
+                </div>
+                <div className="flex gap-4 pt-4">
+                  <button type="button" onClick={() => setShowInvoiceModal(false)} className="flex-1 px-4 py-3 rounded-xl bg-white/5 text-white font-bold hover:bg-white/10">
+                    Cancel
+                  </button>
+                  <button type="submit" className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold">
+                    Create
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

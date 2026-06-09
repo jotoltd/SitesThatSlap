@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { supabase } from './supabase'
 
-interface User {
+export interface User {
   id: string
   email: string
   role: 'client' | 'admin'
@@ -16,39 +17,83 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-// Mock users for demo - replace with Supabase Auth
-const MOCK_USERS = [
-  { id: '1', email: 'admin@jotoltd.com', password: 'admin123', role: 'admin' as const, name: 'Admin' },
-  { id: '2', email: 'client@example.com', password: 'client123', role: 'client' as const, name: 'John Client' },
-]
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Check localStorage for session
-    const stored = localStorage.getItem('auth_user')
-    if (stored) {
-      setUser(JSON.parse(stored))
-    }
-    setIsLoading(false)
+    // Check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        fetchUserProfile(session.user.id)
+      } else {
+        setIsLoading(false)
+      }
+    })
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        fetchUserProfile(session.user.id)
+      } else {
+        setUser(null)
+        setIsLoading(false)
+      }
+    })
+
+    return () => subscription.unsubscribe()
   }, [])
 
-  const login = async (email: string, password: string): Promise<User> => {
-    // Mock auth - replace with Supabase
-    const found = MOCK_USERS.find(u => u.email === email && u.password === password)
-    if (!found) throw new Error('Invalid credentials')
-    
-    const { password: _, ...userWithoutPassword } = found
-    setUser(userWithoutPassword)
-    localStorage.setItem('auth_user', JSON.stringify(userWithoutPassword))
-    return userWithoutPassword
+  const fetchUserProfile = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single()
+
+    if (data && !error) {
+      setUser({
+        id: userId,
+        email: data.email,
+        role: data.role,
+        name: data.name
+      })
+    }
+    setIsLoading(false)
   }
 
-  const logout = () => {
+  const login = async (email: string, password: string): Promise<User> => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    })
+
+    if (error) throw new Error(error.message)
+    if (!data.user) throw new Error('No user returned')
+
+    // Fetch profile
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', data.user.id)
+      .single()
+
+    if (profileError) throw new Error('Failed to load user profile')
+
+    const userData: User = {
+      id: data.user.id,
+      email: data.user.email!,
+      role: profile.role,
+      name: profile.name
+    }
+
+    setUser(userData)
+    return userData
+  }
+
+  const logout = async () => {
+    await supabase.auth.signOut()
     setUser(null)
-    localStorage.removeItem('auth_user')
   }
 
   return (
