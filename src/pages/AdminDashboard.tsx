@@ -11,7 +11,8 @@ import {
 import { 
   Users, FileText, Plus, LogOut, DollarSign, TrendingUp,
   CheckCircle, XCircle, Clock, Send, Trash2, Edit2,
-  Search, Filter, Download, Menu, X, Loader2, MessageSquare, Upload
+  Search, Filter, Download, Menu, X, Loader2, MessageSquare, Upload,
+  CalendarDays
 } from 'lucide-react'
 
 interface Client {
@@ -80,7 +81,7 @@ interface ProjectFile {
 
 export default function AdminDashboard() {
   const { user, logout } = useAuth()
-  const [activeTab, setActiveTab] = useState<'overview' | 'clients' | 'invoices' | 'projects' | 'messages'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'clients' | 'invoices' | 'projects' | 'messages' | 'calendar'>('overview')
   const [searchTerm, setSearchTerm] = useState('')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [clients, setClients] = useState<Client[]>([])
@@ -738,6 +739,7 @@ export default function AdminDashboard() {
                 { id: 'invoices', label: 'Invoices', icon: FileText },
                 { id: 'projects', label: 'Projects', icon: CheckCircle },
                 { id: 'messages', label: 'Messages', icon: MessageSquare, badge: unreadCount },
+                { id: 'calendar', label: 'Calendar', icon: CalendarDays },
               ].map((item, i) => (
                 <motion.button
                   key={item.id}
@@ -790,6 +792,7 @@ export default function AdminDashboard() {
               { id: 'invoices', label: 'Invoices', icon: FileText },
               { id: 'projects', label: 'Projects', icon: CheckCircle },
               { id: 'messages', label: 'Messages', icon: MessageSquare, badge: unreadCount },
+              { id: 'calendar', label: 'Calendar', icon: CalendarDays },
             ].map((item) => (
               <button
                 key={item.id}
@@ -1448,6 +1451,134 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {activeTab === 'calendar' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h1 className="text-3xl font-black text-white">Calendar</h1>
+                <div className="flex gap-2">
+                  <span className="flex items-center gap-2 text-sm text-slate-400">
+                    <span className="w-3 h-3 rounded-full bg-blue-500"></span> Project Deadline
+                  </span>
+                  <span className="flex items-center gap-2 text-sm text-slate-400">
+                    <span className="w-3 h-3 rounded-full bg-red-500"></span> Invoice Due
+                  </span>
+                </div>
+              </div>
+
+              {/* Upcoming Events */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Project Deadlines */}
+                <div className="glass-neon rounded-2xl p-6">
+                  <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5 text-blue-400" />
+                    Project Deadlines
+                  </h2>
+                  {filteredProjects.filter(p => new Date(p.deadline) >= new Date()).length === 0 ? (
+                    <p className="text-slate-400 text-center py-8">No upcoming deadlines</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {filteredProjects
+                        .filter(p => new Date(p.deadline) >= new Date())
+                        .sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime())
+                        .slice(0, 10)
+                        .map(project => (
+                          <div key={project.id} className="flex items-center justify-between p-3 rounded-xl bg-white/5">
+                            <div>
+                              <p className="font-semibold text-white">{project.name}</p>
+                              <p className="text-sm text-slate-400">{project.client?.name || 'Unknown'}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-bold text-blue-400">{new Date(project.deadline).toLocaleDateString()}</p>
+                              <p className="text-xs text-slate-500">
+                                {Math.ceil((new Date(project.deadline).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days left
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Invoice Due Dates */}
+                <div className="glass-neon rounded-2xl p-6">
+                  <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-red-400" />
+                    Invoice Due Dates
+                  </h2>
+                  {filteredInvoices.filter(i => i.status !== 'paid' && new Date(i.due_date) >= new Date()).length === 0 ? (
+                    <p className="text-slate-400 text-center py-8">No upcoming due dates</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {filteredInvoices
+                        .filter(i => i.status !== 'paid' && new Date(i.due_date) >= new Date())
+                        .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())
+                        .slice(0, 10)
+                        .map(invoice => (
+                          <div key={invoice.id} className="flex items-center justify-between p-3 rounded-xl bg-white/5">
+                            <div>
+                              <p className="font-semibold text-white">{invoice.invoice_number}</p>
+                              <p className="text-sm text-slate-400">{invoice.client?.name || 'Unknown'} - £{invoice.amount.toLocaleString()}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className={`text-sm font-bold ${new Date(invoice.due_date) < new Date() ? 'text-red-400' : 'text-yellow-400'}`}>
+                                {new Date(invoice.due_date).toLocaleDateString()}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                {Math.ceil((new Date(invoice.due_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days left
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Monthly Summary */}
+              <div className="glass-neon rounded-2xl p-6">
+                <h2 className="text-xl font-bold text-white mb-4">This Month Overview</h2>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="p-4 rounded-xl bg-gradient-to-r from-blue-500/20 to-blue-600/20 border border-blue-500/30">
+                    <p className="text-sm text-slate-400">Projects Due</p>
+                    <p className="text-2xl font-bold text-white">
+                      {filteredProjects.filter(p => {
+                        const d = new Date(p.deadline)
+                        const now = new Date()
+                        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
+                      }).length}
+                    </p>
+                  </div>
+                  <div className="p-4 rounded-xl bg-gradient-to-r from-red-500/20 to-red-600/20 border border-red-500/30">
+                    <p className="text-sm text-slate-400">Invoices Due</p>
+                    <p className="text-2xl font-bold text-white">
+                      {filteredInvoices.filter(i => i.status !== 'paid' && new Date(i.due_date) >= new Date()).filter(i => {
+                        const d = new Date(i.due_date)
+                        const now = new Date()
+                        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
+                      }).length}
+                    </p>
+                  </div>
+                  <div className="p-4 rounded-xl bg-gradient-to-r from-green-500/20 to-green-600/20 border border-green-500/30">
+                    <p className="text-sm text-slate-400">Paid This Month</p>
+                    <p className="text-2xl font-bold text-white">
+                      £{filteredInvoices.filter(i => i.status === 'paid').filter(i => {
+                        const d = new Date(i.date)
+                        const now = new Date()
+                        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
+                      }).reduce((sum, i) => sum + i.amount, 0).toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="p-4 rounded-xl bg-gradient-to-r from-yellow-500/20 to-yellow-600/20 border border-yellow-500/30">
+                    <p className="text-sm text-slate-400">Pending</p>
+                    <p className="text-2xl font-bold text-white">
+                      £{filteredInvoices.filter(i => i.status === 'pending').reduce((sum, i) => sum + i.amount, 0).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </main>
