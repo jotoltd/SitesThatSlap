@@ -74,6 +74,8 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true)
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
   const [showProjectModal, setShowProjectModal] = useState(false)
+  const [showClientModal, setShowClientModal] = useState(false)
+  const [creatingClient, setCreatingClient] = useState(false)
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null)
   const [selectedClientForMessages, setSelectedClientForMessages] = useState<string | null>(null)
@@ -305,6 +307,37 @@ export default function AdminDashboard() {
     fetchData()
   }
 
+  const handleCreateClient = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setCreatingClient(true)
+    const form = e.target as HTMLFormElement
+    const formData = new FormData(form)
+    
+    const email = formData.get('email') as string
+    const password = formData.get('password') as string
+    const name = formData.get('name') as string
+
+    // Create auth user - profile will be created by trigger
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          name,
+          role: 'client'
+        }
+      }
+    })
+
+    if (error) {
+      alert('Error creating client: ' + error.message)
+    } else {
+      setShowClientModal(false)
+      fetchData()
+    }
+    setCreatingClient(false)
+  }
+
   const handleDeleteProject = async (id: string) => {
     if (!confirm('Delete this project?')) return
     await supabase.from('projects').delete().eq('id', id)
@@ -414,6 +447,9 @@ export default function AdminDashboard() {
                   </button>
                 )}
               </div>
+              <button onClick={() => setShowClientModal(true)} className="hidden md:flex p-2 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold text-sm items-center gap-2">
+                <Plus className="w-4 h-4" /> <span className="hidden sm:inline">New Client</span>
+              </button>
               <button onClick={() => setShowProjectModal(true)} className="hidden md:flex p-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-bold text-sm items-center gap-2">
                 <Plus className="w-4 h-4" /> <span className="hidden sm:inline">New Project</span>
               </button>
@@ -484,6 +520,9 @@ export default function AdminDashboard() {
                 </motion.button>
               ))}
               <div className="pt-4 border-t border-white/10 space-y-2">
+                <button onClick={() => { setShowClientModal(true); setMobileMenuOpen(false); }} className="w-full p-3 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold flex items-center justify-center gap-2">
+                  <Plus className="w-4 h-4" /> New Client
+                </button>
                 <button onClick={() => { setShowProjectModal(true); setMobileMenuOpen(false); }} className="w-full p-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-bold flex items-center justify-center gap-2">
                   <Plus className="w-4 h-4" /> New Project
                 </button>
@@ -786,7 +825,15 @@ export default function AdminDashboard() {
           {/* Clients & Projects tabs would go here - truncated for brevity */}
           {activeTab === 'clients' && (
             <div className="space-y-6">
-              <h1 className="text-3xl font-black text-white">Clients</h1>
+              <div className="flex items-center justify-between">
+                <h1 className="text-3xl font-black text-white">Clients</h1>
+                <button 
+                  onClick={() => setShowClientModal(true)}
+                  className="px-6 py-3 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold flex items-center gap-2"
+                >
+                  <Plus className="w-5 h-5" /> Add Client
+                </button>
+              </div>
               {loading ? (
                 <div className="text-center py-8">
                   <Loader2 className="w-8 h-8 text-pink-500 animate-spin mx-auto" />
@@ -1220,6 +1267,49 @@ export default function AdminDashboard() {
                   </button>
                   <button type="submit" className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-bold">
                     Create
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* Create Client Modal */}
+        {showClientModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+            onClick={() => setShowClientModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="glass-neon rounded-2xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 className="text-2xl font-black text-white mb-6">Create Client</h2>
+              <form onSubmit={handleCreateClient} className="space-y-4">
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Name</label>
+                  <input name="name" type="text" required className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" placeholder="Client name" />
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Email</label>
+                  <input name="email" type="email" required className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" placeholder="client@example.com" />
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Password</label>
+                  <input name="password" type="password" required minLength={6} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" placeholder="Min 6 characters" />
+                </div>
+                <div className="flex gap-4 pt-4">
+                  <button type="button" onClick={() => setShowClientModal(false)} className="flex-1 px-4 py-3 rounded-xl bg-white/5 text-white font-bold hover:bg-white/10">
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={creatingClient} className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold disabled:opacity-50">
+                    {creatingClient ? 'Creating...' : 'Create'}
                   </button>
                 </div>
               </form>
