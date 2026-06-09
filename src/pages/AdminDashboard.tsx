@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase'
 import { 
   Users, FileText, Plus, LogOut, DollarSign, TrendingUp,
   CheckCircle, XCircle, Clock, Send, Trash2, Edit2,
-  Search, Filter, Download, Menu, X, Loader2, MessageSquare
+  Search, Filter, Download, Menu, X, Loader2, MessageSquare, Upload
 } from 'lucide-react'
 
 interface Client {
@@ -48,6 +48,15 @@ interface Message {
   client?: Client
 }
 
+interface ProjectFile {
+  id: string
+  project_id: string
+  file_name: string
+  file_path: string
+  file_size: number
+  created_at: string
+}
+
 export default function AdminDashboard() {
   const { user, logout } = useAuth()
   const [activeTab, setActiveTab] = useState<'overview' | 'clients' | 'invoices' | 'projects' | 'messages'>('overview')
@@ -64,6 +73,9 @@ export default function AdminDashboard() {
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null)
   const [selectedClientForMessages, setSelectedClientForMessages] = useState<string | null>(null)
   const [newAdminMessage, setNewAdminMessage] = useState('')
+  const [selectedProjectForFiles, setSelectedProjectForFiles] = useState<string | null>(null)
+  const [projectFiles, setProjectFiles] = useState<ProjectFile[]>([])
+  const [uploadingFile, setUploadingFile] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -95,6 +107,73 @@ export default function AdminDashboard() {
     })
     setNewAdminMessage('')
     fetchData()
+  }
+
+  const fetchProjectFiles = async (projectId: string) => {
+    const { data } = await supabase
+      .from('project_files')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: false })
+    setProjectFiles(data || [])
+  }
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, projectId: string) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setUploadingFile(true)
+    const filePath = `${projectId}/${Date.now()}_${file.name}`
+    
+    // Upload to Supabase Storage
+    const { error: uploadError } = await supabase.storage
+      .from('project-files')
+      .upload(filePath, file)
+    
+    if (uploadError) {
+      alert('Upload failed: ' + uploadError.message)
+      setUploadingFile(false)
+      return
+    }
+    
+    // Save file record
+    await supabase.from('project_files').insert({
+      project_id: projectId,
+      file_name: file.name,
+      file_path: filePath,
+      file_size: file.size
+    })
+    
+    await fetchProjectFiles(projectId)
+    setUploadingFile(false)
+  }
+
+  const handleDeleteFile = async (file: ProjectFile) => {
+    if (!confirm(`Delete ${file.file_name}?`)) return
+    
+    // Delete from storage
+    await supabase.storage.from('project-files').remove([file.file_path])
+    
+    // Delete record
+    await supabase.from('project_files').delete().eq('id', file.id)
+    
+    if (selectedProjectForFiles) {
+      fetchProjectFiles(selectedProjectForFiles)
+    }
+  }
+
+  const handleDownloadFile = async (file: ProjectFile) => {
+    const { data } = await supabase.storage.from('project-files').download(file.file_path)
+    if (data) {
+      const url = URL.createObjectURL(data)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = file.file_name
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    }
   }
 
   const unreadCount = messages.filter((m: Message) => m.sender === 'client' && !m.read).length
@@ -624,9 +703,79 @@ export default function AdminDashboard() {
                           style={{ width: `${project.progress}%` }}
                         />
                       </div>
-                      <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center justify-between text-sm mb-4">
                         <span className="text-slate-400">{project.progress}% Complete</span>
                         <span className="text-slate-400">Due: {project.deadline}</span>
+                      </div>
+
+                      {/* File Upload */}
+                      <div className="border-t border-white/10 pt-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-sm font-semibold text-white">Files</span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                setSelectedProjectForFiles(project.id)
+                                fetchProjectFiles(project.id)
+                              }}
+                              className="text-xs text-slate-400 hover:text-white"
+                            >
+                              {selectedProjectForFiles === project.id ? 'Hide' : 'View'} Files
+                            </button>
+                            <label className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white cursor-pointer" title="Upload file">
+                              <Upload className="w-4 h-4" />
+                              <input
+                                type="file"
+                                className="hidden"
+                                onChange={(e) => handleFileUpload(e, project.id)}
+                                disabled={uploadingFile}
+                              />
+                            </label>
+                          </div>
+                        </div>
+                        
+                        {selectedProjectForFiles === project.id && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            className="space-y-2"
+                          >
+                            {uploadingFile && (
+                              <div className="flex items-center gap-2 text-sm text-slate-400">
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Uploading...
+                              </div>
+                            )}
+                            {projectFiles.length === 0 ? (
+                              <p className="text-sm text-slate-500">No files uploaded</p>
+                            ) : (
+                              projectFiles.map((file: ProjectFile) => (
+                                <div key={file.id} className="flex items-center justify-between p-2 rounded-lg bg-white/5">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <FileText className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                                    <span className="text-sm text-white truncate">{file.file_name}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1 flex-shrink-0">
+                                    <button
+                                      onClick={() => handleDownloadFile(file)}
+                                      className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white"
+                                      title="Download"
+                                    >
+                                      <Download className="w-3 h-3" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteFile(file)}
+                                      className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-red-400"
+                                      title="Delete"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </motion.div>
+                        )}
                       </div>
                     </motion.div>
                   ))}
