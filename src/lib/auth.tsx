@@ -11,8 +11,10 @@ export interface User {
 interface AuthContextType {
   user: User | null
   login: (email: string, password: string) => Promise<User>
-  logout: () => void
+  logout: () => Promise<void>
   isLoading: boolean
+  suppressAuthChange: boolean
+  setSuppressAuthChange: (value: boolean) => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -20,6 +22,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [suppressAuthChange, setSuppressAuthChange] = useState(false)
 
   useEffect(() => {
     // Check for existing session
@@ -33,6 +36,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      // If suppressed (e.g. admin is creating a client), ignore the event
+      if (suppressAuthChange) return
       if (session?.user) {
         fetchUserProfile(session.user.id)
       } else {
@@ -42,7 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [suppressAuthChange])
 
   const fetchUserProfile = async (userId: string) => {
     const { data, error } = await supabase
@@ -97,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, login, logout, isLoading, suppressAuthChange, setSuppressAuthChange }}>
       {children}
     </AuthContext.Provider>
   )

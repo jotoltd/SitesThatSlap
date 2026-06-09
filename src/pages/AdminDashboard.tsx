@@ -102,7 +102,7 @@ interface ProjectComment {
 }
 
 export default function AdminDashboard() {
-  const { user, logout } = useAuth()
+  const { user, logout, setSuppressAuthChange } = useAuth()
   const [activeTab, setActiveTab] = useState<'overview' | 'clients' | 'invoices' | 'projects' | 'messages' | 'calendar' | 'kanban'>('overview')
   const [searchTerm, setSearchTerm] = useState('')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -698,6 +698,11 @@ export default function AdminDashboard() {
   const handleCreateClient = async (e: React.FormEvent) => {
     e.preventDefault()
     setCreatingClient(true)
+    
+    // Suppress auth state changes during client creation
+    // This prevents the admin from being logged out when signUp() creates the new user
+    setSuppressAuthChange(true)
+    
     const form = e.target as HTMLFormElement
     const formData = new FormData(form)
     
@@ -803,6 +808,7 @@ export default function AdminDashboard() {
       console.error('Error creating client:', err)
       alert('An unexpected error occurred. Please try again.')
     } finally {
+      setSuppressAuthChange(false)
       setCreatingClient(false)
     }
   }
