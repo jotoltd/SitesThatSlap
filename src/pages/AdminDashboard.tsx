@@ -83,6 +83,7 @@ export default function AdminDashboard() {
   const [creatingClient, setCreatingClient] = useState(false)
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null)
+  const [editingClient, setEditingClient] = useState<Client | null>(null)
   const [selectedClientForMessages, setSelectedClientForMessages] = useState<string | null>(null)
   const [newAdminMessage, setNewAdminMessage] = useState('')
   const [selectedProjectForFiles, setSelectedProjectForFiles] = useState<string | null>(null)
@@ -214,6 +215,54 @@ export default function AdminDashboard() {
     if (!confirm('Delete this invoice?')) return
     await supabase.from('invoices').delete().eq('id', id)
     fetchData()
+  }
+
+  const handleDeleteClient = async (id: string, name: string) => {
+    if (!confirm(`Delete client "${name}"?\n\nThis will also delete all their projects, invoices, and messages. This cannot be undone.`)) return
+    
+    // Delete related data first (due to foreign key constraints)
+    await supabase.from('messages').delete().eq('client_id', id)
+    await supabase.from('invoices').delete().eq('client_id', id)
+    await supabase.from('projects').delete().eq('client_id', id)
+    
+    // Delete the client profile
+    const { error } = await supabase.from('profiles').delete().eq('id', id)
+    
+    if (error) {
+      alert('Error deleting client: ' + error.message)
+    } else {
+      fetchData()
+    }
+  }
+
+  const handleEditClient = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingClient) return
+    
+    const form = e.target as HTMLFormElement
+    const formData = new FormData(form)
+    
+    const updates = {
+      name: formData.get('name') as string,
+      email: formData.get('email') as string,
+      phone: formData.get('phone') as string || null,
+      address: formData.get('address') as string || null,
+      company_name: formData.get('company_name') as string || null,
+      website: formData.get('website') as string || null,
+      notes: formData.get('notes') as string || null,
+    }
+
+    const { error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('id', editingClient.id)
+
+    if (error) {
+      alert('Error updating client: ' + error.message)
+    } else {
+      setEditingClient(null)
+      fetchData()
+    }
   }
 
   const handleDownloadInvoice = (invoice: Invoice, clientName: string) => {
@@ -939,9 +988,22 @@ export default function AdminDashboard() {
                         <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 flex items-center justify-center text-white font-bold text-xl">
                           {client.name.charAt(0)}
                         </div>
-                        <span className="text-xs text-slate-500">
-                          {new Date(client.created_at).toLocaleDateString()}
-                        </span>
+                        <div className="flex items-center gap-1">
+                          <button 
+                            onClick={() => setEditingClient(client)}
+                            className="p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white"
+                            title="Edit client"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteClient(client.id, client.name)}
+                            className="p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-red-400"
+                            title="Delete client"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                       
                       <h3 className="font-bold text-white text-lg">{client.name}</h3>
@@ -1581,6 +1643,65 @@ export default function AdminDashboard() {
                     Cancel
                   </button>
                   <button type="submit" className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-bold">
+                    Save
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* Edit Client Modal */}
+        {editingClient && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+            onClick={() => setEditingClient(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="glass-neon rounded-2xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 className="text-2xl font-black text-white mb-6">Edit Client</h2>
+              <form onSubmit={handleEditClient} className="space-y-4">
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Name</label>
+                  <input name="name" type="text" required defaultValue={editingClient.name} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" />
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Email</label>
+                  <input name="email" type="email" required defaultValue={editingClient.email} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" />
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Company Name</label>
+                  <input name="company_name" type="text" defaultValue={editingClient.company_name || ''} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" placeholder="Company Ltd" />
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Phone</label>
+                  <input name="phone" type="tel" defaultValue={editingClient.phone || ''} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" placeholder="+44 123 456 7890" />
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Address</label>
+                  <textarea name="address" rows={2} defaultValue={editingClient.address || ''} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white resize-none" placeholder="123 Street, City, Postcode" />
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Website</label>
+                  <input name="website" type="url" defaultValue={editingClient.website || ''} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" placeholder="https://example.com" />
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Notes</label>
+                  <textarea name="notes" rows={2} defaultValue={editingClient.notes || ''} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white resize-none" placeholder="Any additional notes..." />
+                </div>
+                <div className="flex gap-4 pt-4">
+                  <button type="button" onClick={() => setEditingClient(null)} className="flex-1 px-4 py-3 rounded-xl bg-white/5 text-white font-bold hover:bg-white/10">
+                    Cancel
+                  </button>
+                  <button type="submit" className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold">
                     Save
                   </button>
                 </div>
