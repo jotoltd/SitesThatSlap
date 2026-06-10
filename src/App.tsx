@@ -1,14 +1,12 @@
 import { motion } from 'framer-motion'
 import { useState, useEffect } from 'react'
-import { useLocation, useNavigate, Link } from 'react-router-dom'
+import { useLocation, Link } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import {
   Rocket, Palette, Zap, Globe, Smartphone, ShoppingCart, ArrowRight, Star,
-  CheckCircle2, MapPin, Mail, Phone, PhoneCall, MessageCircle, Menu, X,
-  Ticket, Shield, Calendar, UtensilsCrossed, CreditCard, Home, Building2,
-  Search, Calculator, GraduationCap, CalendarDays, Briefcase, Car,
-  Users, PlayCircle, Trophy, Store, HeartPulse, BedDouble, Dumbbell,
-  HeartHandshake, BarChart3, Scale, FileText,
+  CheckCircle2, MapPin, Mail, Phone, Menu, X,
+  Ticket, Shield, Calendar, UtensilsCrossed, Home,
+  GraduationCap, CalendarDays, Trophy,
 } from 'lucide-react'
 
 // ── Loading Screen ────────────────────────────────────────────────────────────

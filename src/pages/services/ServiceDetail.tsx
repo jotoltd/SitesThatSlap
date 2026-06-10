@@ -4,7 +4,7 @@ import {
   Globe, ShoppingCart, Smartphone, Zap, Palette, Rocket,
   Ticket, Calendar, UtensilsCrossed, Home, GraduationCap, CalendarDays,
   ArrowLeft, CheckCircle2, Clock, Users, Shield, Sparkles,
-  MessageCircle, Mail, Phone
+  MessageCircle, Mail
 } from 'lucide-react'
 
 const servicesData: Record<string, {
