@@ -4,7 +4,7 @@ import { useLocation, Link } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import {
   Rocket, Palette, Zap, Globe, Smartphone, ShoppingCart, ArrowRight, Star,
-  CheckCircle2, MapPin, Mail, Phone, Menu, X,
+  MapPin, Mail, Phone, Menu, X,
   Ticket, Shield, Calendar, UtensilsCrossed, Home,
   GraduationCap, CalendarDays, Trophy,
 } from 'lucide-react'
@@ -247,24 +247,22 @@ function StatsSection() {
 
 // ── Services Section ─────────────────────────────────────────────────────────
 function ServicesSection() {
-  const [openService, setOpenService] = useState<number | null>(null)
-
   const services = [
-    { icon: Globe, title: 'Custom Websites', desc: 'Bespoke websites built from scratch that perfectly represent your brand and convert visitors.', border: 'neon-border-pink', glow: 'neon-text-pink', details: ['Fully custom design tailored to your brand', 'Mobile-first responsive development', 'SEO optimized structure', 'Fast loading speeds', 'Content management system included', '3 rounds of revisions'] },
-    { icon: ShoppingCart, title: 'E-Commerce', desc: 'Powerful online stores that make selling easy. From small shops to enterprise solutions.', border: 'neon-border-purple', glow: 'neon-text-purple', details: ['Secure payment gateway integration', 'Inventory management system', 'Customer account management', 'Order tracking and notifications', 'Abandoned cart recovery', 'Multi-currency support'] },
-    { icon: Smartphone, title: 'Responsive Design', desc: 'Sites that look incredible on every device. Mobile-first approach for maximum reach.', border: 'neon-border-cyan', glow: 'neon-text-cyan', details: ['Mobile-first design approach', 'Tablet and desktop optimization', 'Touch-friendly interfaces', 'Cross-browser compatibility', 'Accessibility compliance (WCAG)', 'Performance optimized for mobile'] },
-    { icon: Zap, title: 'Performance', desc: 'Lightning-fast load times and optimized code that keeps visitors engaged.', border: 'neon-border-pink', glow: 'neon-text-pink', details: ['Core Web Vitals optimization', 'Image and asset optimization', 'CDN implementation', 'Lazy loading for images', 'Code splitting and minification', 'Caching strategies'] },
-    { icon: Palette, title: 'Brand Identity', desc: 'Complete brand packages including logos, color schemes, and visual guidelines.', border: 'neon-border-purple', glow: 'neon-text-purple', details: ['Logo design and variations', 'Color palette definition', 'Typography selection', 'Brand style guide', 'Business card designs', 'Social media assets'] },
-    { icon: Rocket, title: 'SEO & Growth', desc: 'Data-driven strategies to get your site ranking and drive organic traffic.', border: 'neon-border-green', glow: 'neon-text-green', details: ['Keyword research and strategy', 'On-page SEO optimization', 'Technical SEO audit', 'Content strategy', 'Analytics setup and tracking', 'Monthly performance reports'] },
+    { id: 'custom-websites', icon: Globe, title: 'Custom Websites', desc: 'Bespoke websites built from scratch that perfectly represent your brand and convert visitors.', border: 'neon-border-pink', glow: 'neon-text-pink' },
+    { id: 'ecommerce', icon: ShoppingCart, title: 'E-Commerce', desc: 'Powerful online stores that make selling easy. From small shops to enterprise solutions.', border: 'neon-border-purple', glow: 'neon-text-purple' },
+    { id: 'responsive-design', icon: Smartphone, title: 'Responsive Design', desc: 'Sites that look incredible on every device. Mobile-first approach for maximum reach.', border: 'neon-border-cyan', glow: 'neon-text-cyan' },
+    { id: 'performance', icon: Zap, title: 'Performance', desc: 'Lightning-fast load times and optimized code that keeps visitors engaged.', border: 'neon-border-pink', glow: 'neon-text-pink' },
+    { id: 'brand-identity', icon: Palette, title: 'Brand Identity', desc: 'Complete brand packages including logos, color schemes, and visual guidelines.', border: 'neon-border-purple', glow: 'neon-text-purple' },
+    { id: 'seo-growth', icon: Rocket, title: 'SEO & Growth', desc: 'Data-driven strategies to get your site ranking and drive organic traffic.', border: 'neon-border-green', glow: 'neon-text-green' },
   ]
 
   const specialties = [
-    { icon: Ticket, title: 'Raffle Websites', color: 'from-pink-500 to-purple-500', desc: 'Custom-built raffle & competition platforms with secure payments and automated winner selection.', details: ['Secure payment processing', 'Real-time ticket sales tracking', 'Automated winner selection', 'Gambling Commission compliance', 'Admin dashboard', 'Email notifications'] },
-    { icon: Calendar, title: 'Booking Systems', color: 'from-cyan-500 to-blue-500', desc: 'Custom appointment & reservation systems for salons, clinics, restaurants, and events.', details: ['Online appointment scheduling', 'Staff management', 'Automated reminders', 'Payment integration', 'Calendar sync (Google, Outlook)', 'Customer management'] },
-    { icon: UtensilsCrossed, title: 'Restaurant Systems', color: 'from-green-500 to-emerald-500', desc: 'Complete restaurant platforms with online menus, table reservations, and ordering.', details: ['Digital menus with photos', 'Table reservations', 'Online ordering & delivery', 'Kitchen management display', 'Payment processing', 'Loyalty program'] },
-    { icon: Home, title: 'Real Estate', color: 'from-purple-500 to-pink-500', desc: 'Property platforms with search, filters, agent portals, and virtual tours.', details: ['Advanced property search', 'Agent portals & CRM', 'Virtual tours & galleries', 'Mortgage calculators', 'Property alerts', 'Lead management'] },
-    { icon: GraduationCap, title: 'E-Learning', color: 'from-yellow-500 to-orange-500', desc: 'Online course platforms with video lessons, quizzes, and progress tracking.', details: ['Video course hosting', 'Quizzes & assessments', 'Progress tracking', 'Student certificates', 'Drip content scheduling', 'Student analytics'] },
-    { icon: CalendarDays, title: 'Event Platforms', color: 'from-orange-500 to-red-500', desc: 'Event management with ticketing, registration, and attendee management.', details: ['Online ticketing', 'Attendee registration', 'Event scheduling', 'QR code check-in', 'Email notifications', 'Analytics dashboard'] },
+    { id: 'raffle-websites', icon: Ticket, title: 'Raffle Websites', color: 'from-pink-500 to-purple-500', desc: 'Custom-built raffle & competition platforms with secure payments and automated winner selection.' },
+    { id: 'booking-systems', icon: Calendar, title: 'Booking Systems', color: 'from-cyan-500 to-blue-500', desc: 'Custom appointment & reservation systems for salons, clinics, restaurants, and events.' },
+    { id: 'restaurant-systems', icon: UtensilsCrossed, title: 'Restaurant Systems', color: 'from-green-500 to-emerald-500', desc: 'Complete restaurant platforms with online menus, table reservations, and ordering.' },
+    { id: 'real-estate', icon: Home, title: 'Real Estate', color: 'from-purple-500 to-pink-500', desc: 'Property platforms with search, filters, agent portals, and virtual tours.' },
+    { id: 'elearning', icon: GraduationCap, title: 'E-Learning', color: 'from-yellow-500 to-orange-500', desc: 'Online course platforms with video lessons, quizzes, and progress tracking.' },
+    { id: 'event-platforms', icon: CalendarDays, title: 'Event Platforms', color: 'from-orange-500 to-red-500', desc: 'Event management with ticketing, registration, and attendee management.' },
   ]
 
   return (
@@ -287,22 +285,24 @@ function ServicesSection() {
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-20">
           {services.map((s, i) => (
             <motion.div
-              key={i}
-              className={`p-6 rounded-2xl ${s.border} group cursor-pointer`}
-              style={{ background: 'rgba(10,10,30,0.7)' }}
+              key={s.id}
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: i * 0.07 }}
-              whileHover={{ y: -4, scale: 1.02 }}
-              onClick={() => setOpenService(i)}
             >
-              <s.icon className={`w-10 h-10 mb-4 ${s.glow}`} />
-              <h3 className="text-xl font-black text-white mb-2">{s.title}</h3>
-              <p className="text-slate-400 font-medium leading-relaxed">{s.desc}</p>
-              <div className="mt-4 flex items-center gap-1 text-sm font-bold text-pink-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                Click for details <ArrowRight className="w-4 h-4" />
-              </div>
+              <Link
+                to={`/services/${s.id}`}
+                className={`block p-6 rounded-2xl ${s.border} group h-full transition-all hover:scale-[1.02]`}
+                style={{ background: 'rgba(10,10,30,0.7)' }}
+              >
+                <s.icon className={`w-10 h-10 mb-4 ${s.glow}`} />
+                <h3 className="text-xl font-black text-white mb-2">{s.title}</h3>
+                <p className="text-slate-400 font-medium leading-relaxed">{s.desc}</p>
+                <div className="mt-4 flex items-center gap-1 text-sm font-bold text-pink-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                  Learn more <ArrowRight className="w-4 h-4" />
+                </div>
+              </Link>
             </motion.div>
           ))}
         </div>
@@ -311,116 +311,40 @@ function ServicesSection() {
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {specialties.map((s, i) => (
             <motion.div
-              key={i}
-              className="p-6 rounded-2xl border border-white/10 group cursor-pointer"
-              style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)' }}
+              key={s.id}
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: i * 0.1 }}
-              whileHover={{ y: -4, scale: 1.02, borderColor: 'rgba(255,255,255,0.3)' }}
-              onClick={() => setOpenService(100 + i)}
             >
-              <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${s.color} flex items-center justify-center mb-4`}>
-                <s.icon className="w-6 h-6 text-white" />
-              </div>
-              <h4 className="text-lg font-black text-white mb-2">{s.title}</h4>
-              <p className="text-slate-400 text-sm font-medium">{s.desc}</p>
-              <div className="mt-4 flex items-center gap-1 text-sm font-bold text-pink-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                Click for details <ArrowRight className="w-4 h-4" />
-              </div>
+              <Link
+                to={`/services/${s.id}`}
+                className="block p-6 rounded-2xl border border-white/10 group h-full transition-all hover:scale-[1.02] hover:border-white/30"
+                style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)' }}
+              >
+                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${s.color} flex items-center justify-center mb-4`}>
+                  <s.icon className="w-6 h-6 text-white" />
+                </div>
+                <h4 className="text-lg font-black text-white mb-2">{s.title}</h4>
+                <p className="text-slate-400 text-sm font-medium">{s.desc}</p>
+                <div className="mt-4 flex items-center gap-1 text-sm font-bold text-pink-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                  Learn more <ArrowRight className="w-4 h-4" />
+                </div>
+              </Link>
             </motion.div>
           ))}
         </div>
-      </div>
 
-      {/* Service Modal */}
-      {openService !== null && (
-        <motion.div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={() => setOpenService(null)}
-        >
-          <motion.div
-            className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-white/20 bg-[#0a0a1a] p-8"
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.9, opacity: 0 }}
-            onClick={(e) => e.stopPropagation()}
+        {/* View All Services Button */}
+        <div className="text-center mt-12">
+          <Link
+            to="/services"
+            className="inline-flex items-center gap-2 px-8 py-4 rounded-full border border-pink-500/50 text-pink-400 font-bold hover:bg-pink-500/10 transition-colors"
           >
-            <button
-              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors"
-              onClick={() => setOpenService(null)}
-            >
-              <X className="w-5 h-5" />
-            </button>
-            
-            {openService < 100 ? (
-              // Main services
-              <>
-                {(() => {
-                  const s = services[openService]
-                  return (
-                    <>
-                      <s.icon className={`w-16 h-16 mb-6 ${s.glow}`} />
-                      <h3 className="text-3xl font-black text-white mb-4">{s.title}</h3>
-                      <p className="text-slate-400 text-lg mb-8">{s.desc}</p>
-                      <h4 className="text-xl font-bold text-white mb-4">What's Included:</h4>
-                      <ul className="space-y-3">
-                        {s.details.map((detail, idx) => (
-                          <li key={idx} className="flex items-start gap-3 text-slate-300">
-                            <CheckCircle2 className="w-5 h-5 text-pink-500 mt-0.5 shrink-0" />
-                            <span>{detail}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </>
-                  )
-                })()}
-              </>
-            ) : (
-              // Specialty services
-              <>
-                {(() => {
-                  const s = specialties[openService - 100]
-                  return (
-                    <>
-                      <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${s.color} flex items-center justify-center mb-6`}>
-                        <s.icon className="w-8 h-8 text-white" />
-                      </div>
-                      <h3 className="text-3xl font-black text-white mb-4">{s.title}</h3>
-                      <p className="text-slate-400 text-lg mb-8">{s.desc}</p>
-                      <h4 className="text-xl font-bold text-white mb-4">Features:</h4>
-                      <ul className="space-y-3">
-                        {s.details.map((detail, idx) => (
-                          <li key={idx} className="flex items-start gap-3 text-slate-300">
-                            <CheckCircle2 className="w-5 h-5 text-pink-500 mt-0.5 shrink-0" />
-                            <span>{detail}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </>
-                  )
-                })()}
-              </>
-            )}
-            
-            <div className="mt-8 pt-6 border-t border-white/10">
-              <button
-                className="w-full py-4 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold"
-                onClick={() => {
-                  setOpenService(null)
-                  document.querySelector('#contact')?.scrollIntoView({ behavior: 'smooth' })
-                }}
-              >
-                Get a Quote
-              </button>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
+            View All Services <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+      </div>
     </section>
   )
 }
