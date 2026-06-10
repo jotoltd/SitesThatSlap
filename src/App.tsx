@@ -5,7 +5,7 @@ import { Toaster, toast } from 'sonner'
 import { supabase } from './lib/supabase'
 import {
   Rocket, Palette, Zap, Globe, Smartphone, ShoppingCart, ArrowRight, Star,
-  MapPin, Mail, Phone, Menu, X,
+  MapPin, Mail, Phone, Menu, X, MessageCircle,
   Ticket, Shield, Calendar, UtensilsCrossed, Home,
   GraduationCap, CalendarDays, Trophy,
 } from 'lucide-react'
@@ -119,9 +119,16 @@ function Navbar() {
         <motion.button
           onClick={() => setIsOpen(!isOpen)}
           className="md:hidden relative w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden"
-          whileTap={{ scale: 0.95 }}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          animate={{ rotate: isOpen ? 180 : 0 }}
+          transition={{ duration: 0.3 }}
         >
-          <div className="absolute inset-0 bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500" />
+          <motion.div 
+            className="absolute inset-0 bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500"
+            animate={{ rotate: 360 }}
+            transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+          />
           <div className="absolute inset-[2px] rounded-xl bg-[#07070f]" />
           <div className="relative z-10">
             {isOpen ? <X className="w-5 h-5 text-white" /> : <Menu className="w-5 h-5 text-white" />}
@@ -195,12 +202,25 @@ function HeroSection() {
             Cool, modern, big and bold web solutions for businesses that refuse to be boring.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <motion.button onClick={scrollToContact} className="px-10 py-5 gradient-slap text-white font-black text-xl rounded-full glow-pink flex items-center gap-3 justify-center" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}>
-              Start Your Project <ArrowRight className="w-6 h-6" />
-            </motion.button>
-            <motion.button onClick={scrollToWork} className="px-10 py-5 font-black text-xl rounded-full text-white neon-border-cyan" style={{ background: 'rgba(58,134,255,0.08)' }} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}>
-              View Our Work
-            </motion.button>
+            <motion.a 
+              href="https://wa.me/447565871293" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="px-10 py-5 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-black text-xl rounded-full flex items-center gap-3 justify-center shadow-lg shadow-green-500/20" 
+              whileHover={{ scale: 1.05 }} 
+              whileTap={{ scale: 0.97 }}
+            >
+              <MessageCircle className="w-6 h-6" /> WhatsApp
+            </motion.a>
+            <motion.a 
+              href="tel:+447565871293" 
+              className="px-10 py-5 font-black text-xl rounded-full text-white neon-border-cyan flex items-center gap-3 justify-center" 
+              style={{ background: 'rgba(58,134,255,0.08)' }} 
+              whileHover={{ scale: 1.05 }} 
+              whileTap={{ scale: 0.97 }}
+            >
+              <Phone className="w-6 h-6" /> Call Now
+            </motion.a>
           </div>
         </motion.div>
 
@@ -473,10 +493,6 @@ function AboutSection() {
 
 // ── CTA Section ───────────────────────────────────────────────────────────────
 function CTASection() {
-  const scrollToContact = () => {
-    document.querySelector('#contact')?.scrollIntoView({ behavior: 'smooth' })
-  }
-
   return (
     <section className="py-24 flex items-center justify-center bg-[#07070f] relative overflow-hidden">
       <div className="absolute inset-0 neon-grid" />
@@ -495,14 +511,27 @@ function CTASection() {
         <p className="text-xl text-slate-400 font-medium mb-10 max-w-2xl mx-auto">
           Let's build something that demands attention. Your website should be your hardest working employee.
         </p>
-        <motion.button
-          onClick={scrollToContact}
-          className="px-12 py-5 gradient-slap text-white font-black text-xl rounded-full glow-pink"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.97 }}
-        >
-          Start Your Project
-        </motion.button>
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <motion.a 
+            href="https://wa.me/447565871293" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="px-12 py-5 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-black text-xl rounded-full flex items-center gap-3 justify-center shadow-lg shadow-green-500/20"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.97 }}
+          >
+            <MessageCircle className="w-6 h-6" /> WhatsApp
+          </motion.a>
+          <motion.a 
+            href="tel:+447565871293" 
+            className="px-12 py-5 font-black text-xl rounded-full text-white neon-border-cyan flex items-center gap-3 justify-center"
+            style={{ background: 'rgba(58,134,255,0.08)' }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.97 }}
+          >
+            <Phone className="w-6 h-6" /> Call Now
+          </motion.a>
+        </div>
       </motion.div>
     </section>
   )
