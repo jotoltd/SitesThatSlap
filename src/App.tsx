@@ -1,7 +1,8 @@
 import { motion } from 'framer-motion'
 import { useState, useEffect } from 'react'
 import { useLocation, Link } from 'react-router-dom'
-import { Toaster } from 'sonner'
+import { Toaster, toast } from 'sonner'
+import { supabase } from './lib/supabase'
 import {
   Rocket, Palette, Zap, Globe, Smartphone, ShoppingCart, ArrowRight, Star,
   MapPin, Mail, Phone, Menu, X,
@@ -501,6 +502,33 @@ function CTASection() {
 
 // ── Contact Section ─────────────────────────────────────────────────────────
 function ContactSection() {
+  const [formData, setFormData] = useState({ name: '', email: '', message: '' })
+  const [submitting, setSubmitting] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formData.name || !formData.email || !formData.message) {
+      toast.error('Please fill in all fields')
+      return
+    }
+
+    setSubmitting(true)
+    const { error } = await supabase.from('contact_submissions').insert({
+      name: formData.name,
+      email: formData.email,
+      message: formData.message,
+      status: 'new'
+    })
+
+    if (error) {
+      toast.error('Failed to send message. Please try again.')
+    } else {
+      toast.success('Message sent! We\'ll be in touch soon.')
+      setFormData({ name: '', email: '', message: '' })
+    }
+    setSubmitting(false)
+  }
+
   return (
     <section id="contact" className="py-24 bg-[#070712] neon-grid relative overflow-hidden">
       <div className="pointer-events-none absolute bottom-0 right-0 w-96 h-96 neon-orb-purple opacity-20 morph-blob" />
@@ -602,21 +630,43 @@ function ContactSection() {
             viewport={{ once: true }}
           >
             <h3 className="text-2xl font-black text-white mb-6">Send a Message</h3>
-            <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+            <form className="space-y-4" onSubmit={handleSubmit}>
               <div>
                 <label className="block text-sm font-semibold text-slate-300 mb-2">Name</label>
-                <input type="text" className="w-full px-4 py-3 rounded-xl bg-[#0a0a1a] border border-white/10 text-white focus:border-pink-500 outline-none transition-colors" placeholder="Your name" />
+                <input 
+                  type="text" 
+                  value={formData.name}
+                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  className="w-full px-4 py-3 rounded-xl bg-[#0a0a1a] border border-white/10 text-white focus:border-pink-500 outline-none transition-colors" 
+                  placeholder="Your name" 
+                />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-300 mb-2">Email</label>
-                <input type="email" className="w-full px-4 py-3 rounded-xl bg-[#0a0a1a] border border-white/10 text-white focus:border-pink-500 outline-none transition-colors" placeholder="your@email.com" />
+                <input 
+                  type="email" 
+                  value={formData.email}
+                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  className="w-full px-4 py-3 rounded-xl bg-[#0a0a1a] border border-white/10 text-white focus:border-pink-500 outline-none transition-colors" 
+                  placeholder="your@email.com" 
+                />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-300 mb-2">Message</label>
-                <textarea rows={4} className="w-full px-4 py-3 rounded-xl bg-[#0a0a1a] border border-white/10 text-white focus:border-pink-500 outline-none transition-colors resize-none" placeholder="Tell us about your project..." />
+                <textarea 
+                  rows={4} 
+                  value={formData.message}
+                  onChange={(e) => setFormData({...formData, message: e.target.value})}
+                  className="w-full px-4 py-3 rounded-xl bg-[#0a0a1a] border border-white/10 text-white focus:border-pink-500 outline-none transition-colors resize-none" 
+                  placeholder="Tell us about your project..." 
+                />
               </div>
-              <button type="submit" className="w-full py-4 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold hover:opacity-90 transition-opacity">
-                Send Message
+              <button 
+                type="submit" 
+                disabled={submitting}
+                className="w-full py-4 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {submitting ? 'Sending...' : 'Send Message'}
               </button>
             </form>
           </motion.div>

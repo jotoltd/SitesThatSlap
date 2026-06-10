@@ -12,7 +12,6 @@ const servicesData: Record<string, {
   title: string
   subtitle: string
   description: string
-  price: string
   timeline: string
   features: string[]
   deliverables: string[]
@@ -25,7 +24,6 @@ const servicesData: Record<string, {
     title: 'Custom Websites',
     subtitle: 'Bespoke web solutions tailored to your brand',
     description: 'We build completely custom websites from scratch, designed specifically for your business needs. No templates, no cookie-cutter solutions — just unique, high-performing websites that convert visitors into customers.',
-    price: 'From £2,500',
     timeline: '2-4 weeks',
     features: [
       'Fully custom design tailored to your brand identity',
@@ -60,7 +58,6 @@ const servicesData: Record<string, {
     title: 'E-Commerce',
     subtitle: 'Online stores that convert browsers into buyers',
     description: 'Powerful e-commerce solutions built for sales. From small boutique shops to large-scale enterprise stores, we create shopping experiences that drive revenue and keep customers coming back.',
-    price: 'From £3,500',
     timeline: '3-6 weeks',
     features: [
       'Secure payment gateway integration (Stripe, PayPal)',
@@ -95,7 +92,6 @@ const servicesData: Record<string, {
     title: 'Responsive Design',
     subtitle: 'Perfect experience on every device',
     description: 'Mobile-first design approach ensuring your website looks and works flawlessly on phones, tablets, and desktops. We optimize for touch interactions and varying screen sizes.',
-    price: 'From £1,500',
     timeline: '1-3 weeks',
     features: [
       'Mobile-first design approach prioritizing mobile users',
@@ -129,7 +125,6 @@ const servicesData: Record<string, {
     title: 'Performance Optimization',
     subtitle: 'Lightning fast websites that rank higher',
     description: 'Speed matters. We optimize your website to load in under 2 seconds, improving user experience, SEO rankings, and conversion rates. Every millisecond counts.',
-    price: 'From £1,000',
     timeline: '1-2 weeks',
     features: [
       'Core Web Vitals optimization (LCP, FID, CLS)',
@@ -163,7 +158,6 @@ const servicesData: Record<string, {
     title: 'Brand Identity',
     subtitle: 'Complete brand packages that stand out',
     description: 'Your brand is more than a logo. We create comprehensive brand identities including visual systems, color palettes, typography, and guidelines that ensure consistency across all touchpoints.',
-    price: 'From £2,000',
     timeline: '2-4 weeks',
     features: [
       'Logo design with multiple variations and formats',
@@ -197,7 +191,6 @@ const servicesData: Record<string, {
     title: 'SEO & Growth',
     subtitle: 'Data-driven strategies for organic growth',
     description: 'Get found on Google. Our SEO services help you rank higher, drive qualified traffic, and convert visitors into customers through strategic optimization and content.',
-    price: 'From £800/month',
     timeline: 'Ongoing',
     features: [
       'Comprehensive keyword research and strategy',
@@ -231,7 +224,6 @@ const servicesData: Record<string, {
     title: 'Raffle Websites',
     subtitle: 'Competition platforms that drive engagement',
     description: 'Custom raffle and competition platforms built for the UK market. Fully compliant with Gambling Commission requirements, with secure payments and automated winner selection.',
-    price: 'From £5,000',
     timeline: '4-6 weeks',
     features: [
       'Secure payment processing with Stripe integration',
@@ -265,7 +257,6 @@ const servicesData: Record<string, {
     title: 'Booking Systems',
     subtitle: 'Appointment scheduling that saves time',
     description: 'Streamline your bookings with custom scheduling systems. Perfect for salons, clinics, consultants, and any business that takes appointments. Reduce no-shows and maximize your calendar.',
-    price: 'From £3,000',
     timeline: '3-4 weeks',
     features: [
       'Online appointment scheduling 24/7',
@@ -299,7 +290,6 @@ const servicesData: Record<string, {
     title: 'Restaurant Systems',
     subtitle: 'Complete digital solutions for restaurants',
     description: 'Everything a modern restaurant needs: online menus, table reservations, ordering systems, and kitchen management. Increase revenue with online ordering and streamline operations.',
-    price: 'From £4,000',
     timeline: '4-5 weeks',
     features: [
       'Beautiful digital menus with photos and descriptions',
@@ -333,7 +323,6 @@ const servicesData: Record<string, {
     title: 'Real Estate',
     subtitle: 'Property platforms that sell homes',
     description: 'Professional real estate websites with advanced search, agent portals, and virtual tour capabilities. Help buyers find their dream home and agents close more deals.',
-    price: 'From £4,500',
     timeline: '4-6 weeks',
     features: [
       'Advanced property search with filters and maps',
@@ -367,7 +356,6 @@ const servicesData: Record<string, {
     title: 'E-Learning',
     subtitle: 'Course platforms that educate and engage',
     description: 'Build and sell online courses with our custom e-learning platforms. Video hosting, quizzes, progress tracking, and certificates — everything you need to monetize your knowledge.',
-    price: 'From £5,500',
     timeline: '5-7 weeks',
     features: [
       'Secure video course hosting and streaming',
@@ -401,7 +389,6 @@ const servicesData: Record<string, {
     title: 'Event Platforms',
     subtitle: 'Event management made simple',
     description: 'Complete event management solutions with ticketing, registration, and attendee management. Perfect for conferences, workshops, concerts, and any ticketed events.',
-    price: 'From £3,500',
     timeline: '3-5 weeks',
     features: [
       'Professional online ticketing with seat selection',
@@ -473,10 +460,11 @@ export default function ServiceDetail() {
       <div className="px-6 pb-12">
         <div className="max-w-6xl mx-auto">
           <div className="grid md:grid-cols-3 gap-6">
-            <div className="p-6 rounded-xl border border-white/10 bg-white/5">
+            <div className="p-6 rounded-xl border border-white/10 bg-gradient-to-br from-pink-500/10 to-purple-500/10">
               <Sparkles className={`w-8 h-8 ${service.color} mb-3`} />
-              <p className="text-slate-400 text-sm mb-1">Starting Price</p>
-              <p className="text-2xl font-black text-white">{service.price}</p>
+              <p className="text-slate-400 text-sm mb-1">Pricing</p>
+              <p className="text-xl font-black text-white">Flexible Options</p>
+              <p className="text-sm text-slate-400 mt-1">Commission & Free Setup Available</p>
             </div>
             <div className="p-6 rounded-xl border border-white/10 bg-white/5">
               <Clock className={`w-8 h-8 ${service.color} mb-3`} />
@@ -564,6 +552,19 @@ export default function ServiceDetail() {
         </div>
       </div>
 
+      {/* Commission Banner */}
+      <div className="py-16 px-6 bg-[#070712]">
+        <div className="max-w-4xl mx-auto">
+          <div className="p-8 rounded-3xl bg-gradient-to-r from-pink-500/20 via-purple-500/20 to-cyan-500/20 border border-pink-500/30 text-center">
+            <h2 className="text-3xl font-black text-white mb-4">Flexible Partnership Options</h2>
+            <p className="text-lg text-slate-300 mb-6 max-w-2xl mx-auto">
+              We offer commission-based partnerships where we build your site for free in exchange for revenue share. 
+              We also provide completely free setup for qualifying projects. Let's discuss what works best for you!
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* CTA */}
       <div className="py-24 px-6">
         <div className="max-w-4xl mx-auto text-center">
@@ -573,11 +574,11 @@ export default function ServiceDetail() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
-              to="/?section=contact"
+              to="/quote"
               className="inline-flex items-center gap-2 px-8 py-4 gradient-slap text-white font-bold text-lg rounded-full"
             >
               <MessageCircle className="w-5 h-5" />
-              Get a Quote
+              Build Your Quote
             </Link>
             <a
               href="mailto:hello@sitesthatslap.com"

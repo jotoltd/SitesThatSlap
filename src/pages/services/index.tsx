@@ -14,7 +14,6 @@ const mainServices = [
     desc: 'Bespoke websites built from scratch that perfectly represent your brand and convert visitors.',
     border: 'neon-border-pink',
     glow: 'neon-text-pink',
-    price: 'From £2,500',
     features: ['Fully custom design', 'Mobile-first responsive', 'SEO optimized', 'CMS included', '3 rounds of revisions']
   },
   {
@@ -24,7 +23,6 @@ const mainServices = [
     desc: 'Powerful online stores that make selling easy. From small shops to enterprise solutions.',
     border: 'neon-border-purple',
     glow: 'neon-text-purple',
-    price: 'From £3,500',
     features: ['Secure payments', 'Inventory management', 'Customer accounts', 'Order tracking', 'Abandoned cart recovery']
   },
   {
@@ -34,7 +32,6 @@ const mainServices = [
     desc: 'Sites that look incredible on every device. Mobile-first approach for maximum reach.',
     border: 'neon-border-cyan',
     glow: 'neon-text-cyan',
-    price: 'From £1,500',
     features: ['Mobile-first design', 'Cross-browser compatible', 'Touch-friendly', 'Accessibility compliant', 'Performance optimized']
   },
   {
@@ -44,7 +41,6 @@ const mainServices = [
     desc: 'Lightning-fast load times and optimized code that keeps visitors engaged.',
     border: 'neon-border-pink',
     glow: 'neon-text-pink',
-    price: 'From £1,000',
     features: ['Core Web Vitals', 'Image optimization', 'CDN setup', 'Lazy loading', 'Caching strategies']
   },
   {
@@ -54,7 +50,6 @@ const mainServices = [
     desc: 'Complete brand packages including logos, color schemes, and visual guidelines.',
     border: 'neon-border-purple',
     glow: 'neon-text-purple',
-    price: 'From £2,000',
     features: ['Logo design', 'Color palette', 'Typography', 'Style guide', 'Social media assets']
   },
   {
@@ -64,7 +59,6 @@ const mainServices = [
     desc: 'Data-driven strategies to get your site ranking and drive organic traffic.',
     border: 'neon-border-green',
     glow: 'neon-text-green',
-    price: 'From £800/mo',
     features: ['Keyword research', 'On-page SEO', 'Technical audits', 'Content strategy', 'Monthly reports']
   }
 ]
@@ -76,7 +70,6 @@ const specialtyServices = [
     title: 'Raffle Websites',
     color: 'from-pink-500 to-purple-500',
     desc: 'Custom-built raffle & competition platforms with secure payments and automated winner selection.',
-    price: 'From £5,000',
     features: ['Secure payment processing', 'Real-time ticket tracking', 'Automated winner selection', 'Gambling Commission compliance', 'Admin dashboard']
   },
   {
@@ -85,7 +78,6 @@ const specialtyServices = [
     title: 'Booking Systems',
     color: 'from-cyan-500 to-blue-500',
     desc: 'Custom appointment & reservation systems for salons, clinics, restaurants, and events.',
-    price: 'From £3,000',
     features: ['Online scheduling', 'Staff management', 'Automated reminders', 'Payment integration', 'Calendar sync']
   },
   {
@@ -94,7 +86,6 @@ const specialtyServices = [
     title: 'Restaurant Systems',
     color: 'from-green-500 to-emerald-500',
     desc: 'Complete restaurant platforms with online menus, table reservations, and ordering.',
-    price: 'From £4,000',
     features: ['Digital menus', 'Table reservations', 'Online ordering', 'Kitchen display', 'Loyalty program']
   },
   {
@@ -103,7 +94,6 @@ const specialtyServices = [
     title: 'Real Estate',
     color: 'from-purple-500 to-pink-500',
     desc: 'Property platforms with search, filters, agent portals, and virtual tours.',
-    price: 'From £4,500',
     features: ['Property search', 'Agent portals', 'Virtual tours', 'Mortgage calculators', 'Lead management']
   },
   {
@@ -112,7 +102,6 @@ const specialtyServices = [
     title: 'E-Learning',
     color: 'from-yellow-500 to-orange-500',
     desc: 'Online course platforms with video lessons, quizzes, and progress tracking.',
-    price: 'From £5,500',
     features: ['Video hosting', 'Quizzes & assessments', 'Progress tracking', 'Certificates', 'Drip content']
   },
   {
@@ -121,7 +110,6 @@ const specialtyServices = [
     title: 'Event Platforms',
     color: 'from-orange-500 to-red-500',
     desc: 'Event management with ticketing, registration, and attendee management.',
-    price: 'From £3,500',
     features: ['Online ticketing', 'Registration', 'QR check-in', 'Email notifications', 'Analytics']
   }
 ]
@@ -171,8 +159,7 @@ export default function ServicesPage() {
                   <service.icon className={`w-12 h-12 mb-4 ${service.glow}`} />
                   <h3 className="text-xl font-black text-white mb-2">{service.title}</h3>
                   <p className="text-slate-400 text-sm mb-4">{service.desc}</p>
-                  <p className="text-pink-400 font-bold mb-4">{service.price}</p>
-                  <div className="flex items-center gap-1 text-sm font-bold text-white group-hover:text-pink-400 transition-colors">
+                  <div className="flex items-center gap-1 text-sm font-bold text-pink-400 group-hover:text-pink-300 transition-colors">
                     Learn More <ArrowRight className="w-4 h-4" />
                   </div>
                 </Link>
@@ -205,8 +192,7 @@ export default function ServicesPage() {
                   </div>
                   <h3 className="text-xl font-black text-white mb-2">{service.title}</h3>
                   <p className="text-slate-400 text-sm mb-4">{service.desc}</p>
-                  <p className="text-pink-400 font-bold mb-4">{service.price}</p>
-                  <div className="flex items-center gap-1 text-sm font-bold text-white group-hover:text-pink-400 transition-colors">
+                  <div className="flex items-center gap-1 text-sm font-bold text-pink-400 group-hover:text-pink-300 transition-colors">
                     Learn More <ArrowRight className="w-4 h-4" />
                   </div>
                 </Link>
@@ -216,16 +202,45 @@ export default function ServicesPage() {
         </div>
       </section>
 
+      {/* Commission Banner */}
+      <section className="py-16 px-6 bg-[#070712]">
+        <div className="max-w-4xl mx-auto">
+          <div className="p-8 rounded-3xl bg-gradient-to-r from-pink-500/20 via-purple-500/20 to-cyan-500/20 border border-pink-500/30 text-center">
+            <h2 className="text-3xl font-black text-white mb-4">Flexible Partnership Options</h2>
+            <p className="text-lg text-slate-300 mb-6 max-w-2xl mx-auto">
+              We offer commission-based partnerships and completely free setup for qualifying projects. 
+              Let's discuss what works best for your business.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link
+                to="/quote"
+                className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 text-white font-black text-lg"
+              >
+                Build Your Quote
+              </Link>
+              <Link
+                to="/?section=contact"
+                className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-full border border-white/20 text-white font-bold hover:bg-white/5"
+              >
+                Contact Us
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* CTA */}
       <section className="py-24 px-6">
         <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-4xl font-black text-white mb-6">Not sure what you need?</h2>
-          <p className="text-xl text-slate-400 mb-8">Let's chat about your project and find the perfect solution.</p>
+          <h2 className="text-4xl font-black text-white mb-6">Ready to get started?</h2>
+          <p className="text-xl text-slate-400 mb-8">
+            Every project is unique. Let's discuss your requirements and find the perfect solution for your budget.
+          </p>
           <Link
-            to="/?section=contact"
+            to="/quote"
             className="inline-block px-10 py-5 gradient-slap text-white font-black text-xl rounded-full glow-pink"
           >
-            Get in Touch
+            Get a Free Quote
           </Link>
         </div>
       </section>

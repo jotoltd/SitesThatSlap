@@ -107,7 +107,7 @@ interface ProjectComment {
 
 export default function AdminDashboard() {
   const { user, logout, setSuppressAuthChange } = useAuth()
-  const [activeTab, setActiveTab] = useState<'overview' | 'clients' | 'invoices' | 'projects' | 'messages' | 'calendar' | 'kanban' | 'activity'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'clients' | 'invoices' | 'projects' | 'messages' | 'calendar' | 'kanban' | 'activity' | 'quotes' | 'contacts'>('overview')
   const [showSettings, setShowSettings] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -1048,6 +1048,8 @@ export default function AdminDashboard() {
             {[
               { id: 'overview', label: 'Overview', icon: TrendingUp },
               { id: 'clients', label: 'Clients', icon: Users },
+              { id: 'quotes', label: 'Quote Requests', icon: FileText },
+              { id: 'contacts', label: 'Contact Forms', icon: MessageSquare },
               { id: 'invoices', label: 'Invoices', icon: FileText },
               { id: 'projects', label: 'Projects', icon: CheckCircle },
               { id: 'kanban', label: 'Kanban', icon: LayoutGrid },
