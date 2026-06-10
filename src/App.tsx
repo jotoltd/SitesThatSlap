@@ -79,14 +79,6 @@ function Navbar() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  const navLinks = [
-    { href: '#hero', label: 'Home' },
-    { href: '#services', label: 'Services' },
-    { href: '#work', label: 'Work' },
-    { href: '#about', label: 'About' },
-    { href: '#contact', label: 'Contact' },
-  ]
-
   const scrollToSection = (href: string) => {
     const element = document.querySelector(href)
     if (element) {
@@ -104,16 +96,21 @@ function Navbar() {
 
         {/* Desktop Nav */}
         <div className="hidden md:flex items-center gap-8">
-          {navLinks.map((link) => (
-            <a
-              key={link.href}
-              href={link.href}
-              onClick={(e) => { e.preventDefault(); scrollToSection(link.href); }}
-              className="text-sm font-semibold text-slate-300 hover:text-white transition-colors"
-            >
-              {link.label}
-            </a>
-          ))}
+          <a href="#hero" onClick={(e) => { e.preventDefault(); scrollToSection('#hero'); }} className="text-sm font-semibold text-slate-300 hover:text-white transition-colors">
+            Home
+          </a>
+          <Link to="/services" className="text-sm font-semibold text-slate-300 hover:text-white transition-colors">
+            Services
+          </Link>
+          <a href="#work" onClick={(e) => { e.preventDefault(); scrollToSection('#work'); }} className="text-sm font-semibold text-slate-300 hover:text-white transition-colors">
+            Work
+          </a>
+          <a href="#about" onClick={(e) => { e.preventDefault(); scrollToSection('#about'); }} className="text-sm font-semibold text-slate-300 hover:text-white transition-colors">
+            About
+          </a>
+          <a href="#contact" onClick={(e) => { e.preventDefault(); scrollToSection('#contact'); }} className="text-sm font-semibold text-slate-300 hover:text-white transition-colors">
+            Contact
+          </a>
           <Link to="/login" className="px-5 py-2 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold text-sm hover:scale-105 transition-transform">
             Client Login
           </Link>
@@ -133,16 +130,21 @@ function Navbar() {
           className="md:hidden absolute top-full left-0 right-0 bg-[#07070f]/95 backdrop-blur-md border-t border-white/10"
         >
           <div className="flex flex-col p-6 gap-4">
-            {navLinks.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                onClick={(e) => { e.preventDefault(); scrollToSection(link.href); }}
-                className="text-lg font-semibold text-slate-300 hover:text-white transition-colors"
-              >
-                {link.label}
-              </a>
-            ))}
+            <a href="#hero" onClick={(e) => { e.preventDefault(); scrollToSection('#hero'); }} className="text-lg font-semibold text-slate-300 hover:text-white transition-colors">
+              Home
+            </a>
+            <Link to="/services" className="text-lg font-semibold text-slate-300 hover:text-white transition-colors" onClick={() => setIsOpen(false)}>
+              Services
+            </Link>
+            <a href="#work" onClick={(e) => { e.preventDefault(); scrollToSection('#work'); }} className="text-lg font-semibold text-slate-300 hover:text-white transition-colors">
+              Work
+            </a>
+            <a href="#about" onClick={(e) => { e.preventDefault(); scrollToSection('#about'); }} className="text-lg font-semibold text-slate-300 hover:text-white transition-colors">
+              About
+            </a>
+            <a href="#contact" onClick={(e) => { e.preventDefault(); scrollToSection('#contact'); }} className="text-lg font-semibold text-slate-300 hover:text-white transition-colors">
+              Contact
+            </a>
             <Link to="/login" className="px-5 py-3 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold text-center" onClick={() => setIsOpen(false)}>
               Client Login
             </Link>
