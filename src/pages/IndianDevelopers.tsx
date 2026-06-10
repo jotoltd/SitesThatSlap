@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { 
   Globe, Zap, Users, CheckCircle, Loader2, 
-  Send, Sparkles, Laptop
+  Send, Laptop
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { toast } from 'sonner'
@@ -133,18 +133,19 @@ export default function IndianDevelopers() {
               animate={{ opacity: 1, y: 0 }}
             >
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-pink-500/20 to-purple-500/20 border border-pink-500/30 mb-6">
-                <Sparkles className="w-4 h-4 text-pink-400" />
+                <span className="text-2xl">🇮🇳</span>
+                <span className="text-2xl">🇵🇰</span>
                 <span className="text-pink-400 text-sm font-semibold">Join Our Developer Network</span>
               </div>
               
               <h1 className="text-5xl md:text-7xl font-black text-white mb-6">
-                Indian Developers<br />
-                <span className="neon-text-pink">Wanted</span>
+                Indian & Pakistani<br />
+                <span className="neon-text-pink">Developers Wanted</span>
               </h1>
               
               <p className="text-xl text-slate-400 max-w-2xl mx-auto mb-8">
-                We're building the best remote developer network in India. 
-                Join us and work on exciting global projects.
+                We're building the best remote developer network in India and Pakistan. 
+                Join us and work on exciting global projects from anywhere.
               </p>
               
               <div className="flex flex-wrap justify-center gap-4 text-sm text-slate-500">
