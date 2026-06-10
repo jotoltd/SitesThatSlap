@@ -62,33 +62,33 @@
   }
 
   .glow-pink {
-    box-shadow: 0 0 20px rgba(255, 0, 110, 0.7), 0 0 60px rgba(255, 0, 110, 0.4), 0 0 100px rgba(255, 0, 110, 0.2);
+    box-shadow: 0 0 15px rgba(255, 0, 110, 0.3), 0 0 40px rgba(255, 0, 110, 0.15), 0 0 80px rgba(255, 0, 110, 0.05);
   }
   .glow-purple {
-    box-shadow: 0 0 20px rgba(131, 56, 236, 0.7), 0 0 60px rgba(131, 56, 236, 0.4), 0 0 100px rgba(131, 56, 236, 0.2);
+    box-shadow: 0 0 15px rgba(131, 56, 236, 0.3), 0 0 40px rgba(131, 56, 236, 0.15), 0 0 80px rgba(131, 56, 236, 0.05);
   }
   .glow-cyan {
-    box-shadow: 0 0 20px rgba(58, 134, 255, 0.7), 0 0 60px rgba(58, 134, 255, 0.4), 0 0 100px rgba(58, 134, 255, 0.2);
+    box-shadow: 0 0 15px rgba(58, 134, 255, 0.3), 0 0 40px rgba(58, 134, 255, 0.15), 0 0 80px rgba(58, 134, 255, 0.05);
   }
   .glow-green {
-    box-shadow: 0 0 20px rgba(6, 255, 165, 0.7), 0 0 60px rgba(6, 255, 165, 0.4), 0 0 100px rgba(6, 255, 165, 0.2);
+    box-shadow: 0 0 15px rgba(6, 255, 165, 0.3), 0 0 40px rgba(6, 255, 165, 0.15), 0 0 80px rgba(6, 255, 165, 0.05);
   }
 
   .neon-border-pink {
-    border: 1px solid #FF006E;
-    box-shadow: 0 0 8px #FF006E, inset 0 0 8px rgba(255, 0, 110, 0.1);
+    border: 1px solid rgba(255, 0, 110, 0.4);
+    box-shadow: 0 0 6px rgba(255, 0, 110, 0.2), inset 0 0 6px rgba(255, 0, 110, 0.05);
   }
   .neon-border-purple {
-    border: 1px solid #8338EC;
-    box-shadow: 0 0 8px #8338EC, inset 0 0 8px rgba(131, 56, 236, 0.1);
+    border: 1px solid rgba(131, 56, 236, 0.4);
+    box-shadow: 0 0 6px rgba(131, 56, 236, 0.2), inset 0 0 6px rgba(131, 56, 236, 0.05);
   }
   .neon-border-cyan {
-    border: 1px solid #3A86FF;
-    box-shadow: 0 0 8px #3A86FF, inset 0 0 8px rgba(58, 134, 255, 0.1);
+    border: 1px solid rgba(58, 134, 255, 0.4);
+    box-shadow: 0 0 6px rgba(58, 134, 255, 0.2), inset 0 0 6px rgba(58, 134, 255, 0.05);
   }
   .neon-border-green {
-    border: 1px solid #06FFA5;
-    box-shadow: 0 0 8px #06FFA5, inset 0 0 8px rgba(6, 255, 165, 0.1);
+    border: 1px solid rgba(6, 255, 165, 0.4);
+    box-shadow: 0 0 6px rgba(6, 255, 165, 0.2), inset 0 0 6px rgba(6, 255, 165, 0.05);
   }
 
   .stroke-text-neon {
@@ -101,9 +101,62 @@
 /* ── Neon Grid Background ────────────────────────────────────── */
 .neon-grid {
   background-image:
-    linear-gradient(rgba(255, 0, 110, 0.07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 0, 110, 0.07) 1px, transparent 1px);
+    linear-gradient(rgba(255, 0, 110, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 0, 110, 0.03) 1px, transparent 1px);
   background-size: 60px 60px;
+}
+
+/* ── Subtle Background Glow ───────────────────────────────────── */
+.bg-glow-pink {
+  background: radial-gradient(ellipse at 20% 20%, rgba(255, 0, 110, 0.08) 0%, transparent 50%);
+}
+.bg-glow-purple {
+  background: radial-gradient(ellipse at 80% 80%, rgba(131, 56, 236, 0.08) 0%, transparent 50%);
+}
+.bg-glow-cyan {
+  background: radial-gradient(ellipse at 50% 50%, rgba(58, 134, 255, 0.06) 0%, transparent 50%);
+}
+
+/* ── Silent Floating Orbs ────────────────────────────────────── */
+.orb-silent {
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.15;
+  pointer-events: none;
+  z-index: 0;
+}
+.orb-silent-1 {
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(255, 0, 110, 0.4) 0%, transparent 70%);
+  top: -100px;
+  left: -100px;
+  animation: float-slow 20s ease-in-out infinite;
+}
+.orb-silent-2 {
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(131, 56, 236, 0.4) 0%, transparent 70%);
+  bottom: -150px;
+  right: -100px;
+  animation: float-slow 25s ease-in-out infinite reverse;
+}
+.orb-silent-3 {
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(58, 134, 255, 0.3) 0%, transparent 70%);
+  top: 50%;
+  left: 50%;
+  animation: float-slow 30s ease-in-out infinite;
+  animation-delay: -10s;
+}
+
+@keyframes float-slow {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(30px, -30px) scale(1.05); }
+  50% { transform: translate(-20px, 20px) scale(0.95); }
+  75% { transform: translate(20px, 30px) scale(1.02); }
 }
 
 /* ── Scanlines ───────────────────────────────────────────────── */

@@ -760,6 +760,10 @@ export default function App() {
     <>
       {loading && <LoadingScreen onComplete={() => setLoading(false)} />}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: loading ? 0 : 1 }} transition={{ duration: 0.6 }}>
+        {/* Silent Background Orbs */}
+        <div className="orb-silent orb-silent-1" />
+        <div className="orb-silent orb-silent-2" />
+        <div className="orb-silent orb-silent-3" />
         <Navbar />
         <main>
           <HeroSection />
