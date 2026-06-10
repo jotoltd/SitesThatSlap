@@ -12,9 +12,24 @@ import {
 
 // ── Loading Screen ────────────────────────────────────────────────────────────
 function LoadingScreen({ onComplete }: { onComplete: () => void }) {
+  const [progress, setProgress] = useState(0)
+  
   useEffect(() => {
-    const t = setTimeout(onComplete, 2200)
-    return () => clearTimeout(t)
+    const duration = 2200
+    const steps = 100
+    const interval = duration / steps
+    
+    let current = 0
+    const timer = setInterval(() => {
+      current += 1
+      setProgress(current)
+      if (current >= 100) {
+        clearInterval(timer)
+        setTimeout(onComplete, 200)
+      }
+    }, interval)
+    
+    return () => clearInterval(timer)
   }, [onComplete])
 
   return (
@@ -44,14 +59,20 @@ function LoadingScreen({ onComplete }: { onComplete: () => void }) {
         >
           <span className="text-white font-black text-5xl" style={{ fontFamily: 'Orbitron, sans-serif' }}>S</span>
         </motion.div>
-        <motion.p
-          className="neon-text-pink font-bold tracking-widest text-sm uppercase"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: [0, 1, 0.6, 1] }}
-          transition={{ delay: 0.6, duration: 1.4, repeat: Infinity }}
-        >
-          Booting up...
-        </motion.p>
+        <div className="flex flex-col items-center gap-2">
+          <motion.p
+            className="neon-text-pink font-black text-4xl tracking-wider"
+            style={{ fontFamily: 'Orbitron, sans-serif' }}
+          >
+            {progress}%
+          </motion.p>
+          <div className="w-48 h-1 bg-white/10 rounded-full overflow-hidden">
+            <motion.div 
+              className="h-full bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        </div>
       </div>
     </motion.div>
   )
