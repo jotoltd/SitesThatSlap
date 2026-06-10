@@ -5,8 +5,10 @@ import { supabase } from '../lib/supabase'
 import { jsPDF } from 'jspdf'
 import { 
   FileText, CreditCard, MessageSquare, CheckCircle2, 
-  Clock, Download, LogOut, User, Loader2, Send
+  Clock, Download, LogOut, User, Loader2, Send, Settings
 } from 'lucide-react'
+import { NotificationBell } from '../components/Notifications'
+import SettingsModal from '../components/SettingsModal'
 
 interface Project {
   id: string
@@ -38,6 +40,7 @@ interface Message {
 export default function ClientDashboard() {
   const { user, logout } = useAuth()
   const [activeTab, setActiveTab] = useState<'projects' | 'invoices' | 'messages'>('projects')
+  const [showSettings, setShowSettings] = useState(false)
   const [projects, setProjects] = useState<Project[]>([])
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [messages, setMessages] = useState<Message[]>([])
@@ -180,6 +183,13 @@ export default function ClientDashboard() {
                 <p className="text-xs text-slate-400">Client Portal</p>
               </div>
             </div>
+            <NotificationBell />
+            <button 
+              onClick={() => setShowSettings(true)}
+              className="p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
             <button 
               onClick={handleLogout}
               className="p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
@@ -416,6 +426,9 @@ export default function ClientDashboard() {
           )}
         </div>
       </div>
+
+      {/* Settings Modal */}
+      <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
     </div>
   )
 }

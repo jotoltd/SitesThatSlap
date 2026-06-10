@@ -6,15 +6,25 @@ export interface User {
   email: string
   role: 'client' | 'admin'
   name: string
+  phone?: string
+  company_name?: string
+  notification_settings?: {
+    email?: boolean
+    projects?: boolean
+    invoices?: boolean
+    marketing?: boolean
+  }
 }
 
 interface AuthContextType {
   user: User | null
+  setUser: (user: User | null) => void
   login: (email: string, password: string) => Promise<User>
   logout: () => Promise<void>
   isLoading: boolean
   suppressAuthChange: boolean
   setSuppressAuthChange: (value: boolean) => void
+  refreshUser: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -69,7 +79,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         id: userId,
         email: data.email,
         role: data.role,
-        name: data.name
+        name: data.name,
+        phone: data.phone,
+        company_name: data.company_name,
+        notification_settings: data.notification_settings
       })
     }
     setIsLoading(false)
@@ -97,7 +110,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       id: data.user.id,
       email: data.user.email!,
       role: profile.role,
-      name: profile.name
+      name: profile.name,
+      phone: profile.phone,
+      company_name: profile.company_name,
+      notification_settings: profile.notification_settings
     }
 
     setUser(userData)
@@ -109,8 +125,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
   }
 
+  const refreshUser = async () => {
+    if (user) {
+      await fetchUserProfile(user.id)
+    }
+  }
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading, suppressAuthChange, setSuppressAuthChange }}>
+    <AuthContext.Provider value={{ user, setUser, login, logout, isLoading, suppressAuthChange, setSuppressAuthChange, refreshUser }}>
       {children}
     </AuthContext.Provider>
   )

@@ -12,8 +12,12 @@ import {
   Users, FileText, Plus, LogOut, DollarSign, TrendingUp,
   CheckCircle, XCircle, Clock, Send, Trash2, Edit2,
   Search, Filter, Download, Menu, X, Loader2, MessageSquare, Upload,
-  CalendarDays, LayoutGrid, Github
+  CalendarDays, LayoutGrid, Github, Settings, Activity
 } from 'lucide-react'
+import { NotificationBell } from '../components/Notifications'
+import SettingsModal from '../components/SettingsModal'
+import ActivityLog from '../components/ActivityLog'
+import { useActivityLog } from '../components/ActivityLog'
 
 interface Client {
   id: string
@@ -103,7 +107,8 @@ interface ProjectComment {
 
 export default function AdminDashboard() {
   const { user, logout, setSuppressAuthChange } = useAuth()
-  const [activeTab, setActiveTab] = useState<'overview' | 'clients' | 'invoices' | 'projects' | 'messages' | 'calendar' | 'kanban'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'clients' | 'invoices' | 'projects' | 'messages' | 'calendar' | 'kanban' | 'activity'>('overview')
+  const [showSettings, setShowSettings] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [clients, setClients] = useState<Client[]>([])
@@ -950,6 +955,10 @@ export default function AdminDashboard() {
               <button onClick={() => setShowInvoiceModal(true)} className="hidden md:flex p-2 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold text-sm items-center gap-2">
                 <Plus className="w-4 h-4" /> <span className="hidden sm:inline">New Invoice</span>
               </button>
+              <NotificationBell />
+              <button onClick={() => setShowSettings(true)} className="p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors">
+                <Settings className="w-5 h-5" />
+              </button>
               <button onClick={handleLogout} className="p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors">
                 <LogOut className="w-5 h-5" />
               </button>
@@ -1044,6 +1053,7 @@ export default function AdminDashboard() {
               { id: 'kanban', label: 'Kanban', icon: LayoutGrid },
               { id: 'messages', label: 'Messages', icon: MessageSquare, badge: unreadCount },
               { id: 'calendar', label: 'Calendar', icon: CalendarDays },
+              { id: 'activity', label: 'Activity Log', icon: Activity },
             ].map((item) => (
               <button
                 key={item.id}
@@ -2142,8 +2152,23 @@ export default function AdminDashboard() {
               </div>
             </div>
           )}
+
+          {activeTab === 'activity' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h1 className="text-3xl font-black text-white">Activity Log</h1>
+                <p className="text-slate-400">Track all actions across the platform</p>
+              </div>
+              <div className="glass-neon rounded-2xl p-6">
+                <ActivityLog limit={100} />
+              </div>
+            </div>
+          )}
         </main>
       </div>
+
+      {/* Settings Modal */}
+      <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
 
       {/* Create Invoice Modal */}
       <AnimatePresence>
