@@ -17,7 +17,6 @@ import {
 import { NotificationBell } from '../components/Notifications'
 import SettingsModal from '../components/SettingsModal'
 import ActivityLog from '../components/ActivityLog'
-import { useActivityLog } from '../components/ActivityLog'
 
 interface Client {
   id: string
