@@ -116,9 +116,17 @@ function Navbar() {
         </div>
 
         {/* Mobile Menu Button */}
-        <button className="md:hidden text-white" onClick={() => setIsOpen(!isOpen)}>
-          {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-        </button>
+        <motion.button
+          onClick={() => setIsOpen(!isOpen)}
+          className="md:hidden relative w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden"
+          whileTap={{ scale: 0.95 }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500" />
+          <div className="absolute inset-[2px] rounded-xl bg-[#07070f]" />
+          <div className="relative z-10">
+            {isOpen ? <X className="w-5 h-5 text-white" /> : <Menu className="w-5 h-5 text-white" />}
+          </div>
+        </motion.button>
       </div>
 
       {/* Mobile Nav */}
