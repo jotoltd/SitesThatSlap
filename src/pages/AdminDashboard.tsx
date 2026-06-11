@@ -1847,6 +1847,7 @@ export default function AdminDashboard() {
               <div className="flex items-center justify-between">
                 <h1 className="text-3xl font-black text-white">Invoices</h1>
                 <button 
+                  onClick={() => setShowInvoiceModal(true)}
                   className="px-6 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold flex items-center gap-2"
                 >
                   <Plus className="w-5 h-5" /> Create Invoice
