@@ -681,61 +681,150 @@ export default function AdminDashboard() {
     }
   }
 
-  const handleDownloadInvoice = (invoice: Invoice, clientName: string) => {
+  const handleDownloadInvoice = async (invoice: Invoice, clientName: string) => {
     const doc = new jsPDF()
-    
-    // Header
-    doc.setFillColor(255, 0, 110)
-    doc.rect(0, 0, 210, 40, 'F')
-    doc.setTextColor(255, 255, 255)
-    doc.setFontSize(24)
-    doc.text('Sites That Slap', 20, 25)
-    doc.setFontSize(12)
-    doc.text('Joto Ltd', 20, 32)
-    
-    // Invoice Title
-    doc.setTextColor(255, 0, 110)
-    doc.setFontSize(28)
-    doc.text('INVOICE', 140, 25)
-    
-    // Invoice Details
-    doc.setTextColor(100, 100, 100)
-    doc.setFontSize(10)
-    doc.text(`Invoice #: ${invoice.invoice_number}`, 140, 32)
-    doc.text(`Date: ${invoice.date}`, 140, 37)
-    
+    const pw = 210
+    const pink = [255, 0, 110] as const
+    const dark = [30, 30, 30] as const
+    const grey = [120, 120, 120] as const
+    const light = [180, 180, 180] as const
+
+    // Header bar
+    doc.setFillColor(...pink)
+    doc.rect(0, 0, pw, 4, 'F')
+
+    // Company info
+    doc.setTextColor(...dark)
+    doc.setFontSize(22)
+    doc.setFont('helvetica', 'bold')
+    doc.text('SITES THAT SLAP', 20, 22)
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(...grey)
+    doc.text('Gedker Ltd  •  Leeds, West Yorkshire', 20, 28)
+    doc.text('hello@sitesthatslap.com  •  www.sitesthatslap.com', 20, 33)
+
+    // INVOICE title
+    doc.setTextColor(...pink)
+    doc.setFontSize(32)
+    doc.setFont('helvetica', 'bold')
+    doc.text('INVOICE', pw - 20, 22, { align: 'right' })
+
+    // Invoice meta
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(...grey)
+    doc.text(`Invoice:  ${invoice.invoice_number}`, pw - 20, 30, { align: 'right' })
+    doc.text(`Date:  ${new Date(invoice.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`, pw - 20, 35, { align: 'right' })
+    doc.text(`Due:  ${new Date(invoice.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`, pw - 20, 40, { align: 'right' })
+
+    // Divider
+    doc.setDrawColor(230, 230, 230)
+    doc.line(20, 46, pw - 20, 46)
+
     // Bill To
-    doc.setTextColor(0, 0, 0)
-    doc.setFontSize(14)
-    doc.text('Bill To:', 20, 60)
+    doc.setTextColor(...light)
+    doc.setFontSize(8)
+    doc.setFont('helvetica', 'bold')
+    doc.text('BILL TO', 20, 55)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(...dark)
+    doc.setFontSize(11)
+    doc.text(clientName || 'Client', 20, 62)
+    const client = clients.find((c: Client) => c.id === invoice.client_id)
+    if (client?.email) { doc.setFontSize(9); doc.setTextColor(...grey); doc.text(client.email, 20, 68) }
+    if (client?.company_name) { doc.setFontSize(9); doc.setTextColor(...grey); doc.text(client.company_name, 20, 74) }
+
+    // Status badge
+    const statusColors: Record<string, [number, number, number]> = { paid: [16, 185, 129], pending: [245, 158, 11], overdue: [239, 68, 68] }
+    const sc = statusColors[invoice.status] || [120, 120, 120]
+    doc.setFillColor(...sc)
+    doc.roundedRect(pw - 55, 52, 35, 10, 2, 2, 'F')
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(8)
+    doc.setFont('helvetica', 'bold')
+    doc.text(invoice.status.toUpperCase(), pw - 37.5, 58.5, { align: 'center' })
+
+    // Fetch line items
+    const { data: items } = await supabase.from('invoice_items').select('*').eq('invoice_id', invoice.id).order('created_at')
+    const lineItems = items || []
+
+    // Table header
+    let y = 88
+    doc.setFillColor(245, 245, 250)
+    doc.rect(20, y - 5, pw - 40, 10, 'F')
+    doc.setTextColor(...grey)
+    doc.setFontSize(8)
+    doc.setFont('helvetica', 'bold')
+    doc.text('DESCRIPTION', 24, y + 1)
+    doc.text('QTY', 120, y + 1, { align: 'center' })
+    doc.text('RATE', 145, y + 1, { align: 'right' })
+    doc.text('AMOUNT', pw - 24, y + 1, { align: 'right' })
+    y += 12
+
+    // Table rows
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9)
+    if (lineItems.length > 0) {
+      lineItems.forEach((item: any) => {
+        doc.setTextColor(...dark)
+        doc.text(item.description || '', 24, y)
+        doc.text(String(item.quantity), 120, y, { align: 'center' })
+        doc.text(`£${Number(item.rate).toLocaleString()}`, 145, y, { align: 'right' })
+        doc.text(`£${Number(item.amount).toLocaleString()}`, pw - 24, y, { align: 'right' })
+        doc.setDrawColor(240, 240, 240)
+        doc.line(20, y + 3, pw - 20, y + 3)
+        y += 10
+      })
+    } else {
+      doc.setTextColor(...dark)
+      doc.text('Web design & development services', 24, y)
+      doc.text('1', 120, y, { align: 'center' })
+      doc.text(`£${invoice.amount.toLocaleString()}`, 145, y, { align: 'right' })
+      doc.text(`£${invoice.amount.toLocaleString()}`, pw - 24, y, { align: 'right' })
+      y += 10
+    }
+
+    // Totals
+    y += 5
+    doc.setDrawColor(200, 200, 200)
+    doc.line(120, y, pw - 20, y)
+    y += 8
+    doc.setTextColor(...grey)
+    doc.setFontSize(9)
+    doc.text('Subtotal', 130, y)
+    doc.setTextColor(...dark)
+    doc.text(`£${invoice.amount.toLocaleString()}`, pw - 24, y, { align: 'right' })
+    y += 7
+    doc.setTextColor(...grey)
+    doc.text('VAT (0%)', 130, y)
+    doc.setTextColor(...dark)
+    doc.text('£0.00', pw - 24, y, { align: 'right' })
+    y += 3
+    doc.setDrawColor(...pink)
+    doc.setLineWidth(0.5)
+    doc.line(120, y, pw - 20, y)
+    y += 8
+    doc.setFont('helvetica', 'bold')
     doc.setFontSize(12)
-    doc.setTextColor(100, 100, 100)
-    doc.text(clientName || 'Client', 20, 68)
-    
-    // Amount Box
-    doc.setFillColor(248, 249, 250)
-    doc.roundedRect(120, 55, 70, 35, 3, 3, 'F')
-    doc.setTextColor(100, 100, 100)
-    doc.setFontSize(10)
-    doc.text('Amount Due', 130, 68)
-    doc.setTextColor(255, 0, 110)
-    doc.setFontSize(20)
-    doc.text(`£${invoice.amount.toLocaleString()}`, 130, 80)
-    
-    // Status
-    doc.setFontSize(10)
-    doc.setTextColor(100, 100, 100)
-    doc.text(`Status: ${invoice.status.toUpperCase()}`, 20, 100)
-    doc.text(`Due Date: ${invoice.due_date}`, 20, 107)
-    
+    doc.setTextColor(...pink)
+    doc.text('TOTAL', 130, y)
+    doc.text(`£${invoice.amount.toLocaleString()}`, pw - 24, y, { align: 'right' })
+
     // Footer
-    doc.setDrawColor(255, 0, 110)
-    doc.line(20, 250, 190, 250)
-    doc.setTextColor(100, 100, 100)
-    doc.setFontSize(10)
-    doc.text('Thank you for your business!', 20, 260)
-    doc.text('Sites That Slap - hello@sitesthatslap.com', 20, 267)
-    
+    const fy = 265
+    doc.setDrawColor(230, 230, 230)
+    doc.setLineWidth(0.3)
+    doc.line(20, fy, pw - 20, fy)
+    doc.setTextColor(...light)
+    doc.setFontSize(8)
+    doc.setFont('helvetica', 'normal')
+    doc.text('Payment is due within 14 days of the invoice date.', 20, fy + 6)
+    doc.text('Bank: Gedker Ltd  •  Sort: Please contact for details', 20, fy + 11)
+    doc.setTextColor(...pink)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Thank you for choosing Sites That Slap!', pw / 2, fy + 20, { align: 'center' })
+
     doc.save(`${invoice.invoice_number}.pdf`)
   }
 

@@ -54,7 +54,7 @@ serve(async (req) => {
             currency: 'gbp',
             product_data: {
               name: `Invoice #${invoice.invoice_number}`,
-              description: `Payment to Sites That Slap (Joto Ltd)`,
+              description: `Payment to Sites That Slap (Gedker Ltd)`,
             },
             unit_amount: Math.round(invoice.amount * 100), // Convert to pence
           },

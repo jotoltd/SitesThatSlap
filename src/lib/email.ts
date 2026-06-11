@@ -32,7 +32,7 @@ export function quoteConfirmationEmail(name: string) {
         <p style="color: #444; line-height: 1.6;">In the meantime, feel free to reply to this email with any additional details about your project.</p>
       </div>
       <div style="text-align: center; margin-top: 30px; color: #999; font-size: 12px;">
-        <p>Sites That Slap (Joto Ltd) • Leeds, West Yorkshire</p>
+        <p>Sites That Slap (Gedker Ltd) • Leeds, West Yorkshire</p>
         <p><a href="https://www.sitesthatslap.com" style="color: #FF006E;">www.sitesthatslap.com</a></p>
       </div>
     </div>
@@ -52,7 +52,7 @@ export function contactAutoReplyEmail(name: string) {
         <p style="color: #444; line-height: 1.6;">If it's urgent, you can reach us at <a href="mailto:hello@sitesthatslap.com" style="color: #8338EC;">hello@sitesthatslap.com</a></p>
       </div>
       <div style="text-align: center; margin-top: 30px; color: #999; font-size: 12px;">
-        <p>Sites That Slap (Joto Ltd) • Leeds, West Yorkshire</p>
+        <p>Sites That Slap (Gedker Ltd) • Leeds, West Yorkshire</p>
         <p><a href="https://www.sitesthatslap.com" style="color: #FF006E;">www.sitesthatslap.com</a></p>
       </div>
     </div>
@@ -87,7 +87,7 @@ export function clientWelcomeEmail(name: string, email: string, password: string
         </div>
       </div>
       <div style="text-align: center; margin-top: 30px; color: #999; font-size: 12px;">
-        <p>Sites That Slap (Joto Ltd) • Leeds, West Yorkshire</p>
+        <p>Sites That Slap (Gedker Ltd) • Leeds, West Yorkshire</p>
         <p><a href="https://www.sitesthatslap.com" style="color: #FF006E;">www.sitesthatslap.com</a></p>
       </div>
     </div>
@@ -113,7 +113,7 @@ export function invoiceNotificationEmail(name: string, invoiceNumber: string, am
         </div>
       </div>
       <div style="text-align: center; margin-top: 30px; color: #999; font-size: 12px;">
-        <p>Sites That Slap (Joto Ltd) • Leeds, West Yorkshire</p>
+        <p>Sites That Slap (Gedker Ltd) • Leeds, West Yorkshire</p>
         <p><a href="https://www.sitesthatslap.com" style="color: #FF006E;">www.sitesthatslap.com</a></p>
       </div>
     </div>
