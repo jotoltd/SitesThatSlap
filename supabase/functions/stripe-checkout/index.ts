@@ -54,9 +54,11 @@ serve(async (req) => {
       })
     }
 
+    const siteUrl = Deno.env.get('SITE_URL') || 'https://www.sitesthatslap.com'
+
     // Create Stripe Checkout Session
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
+      payment_method_types: ['card', 'bacs_debit'],
       line_items: [
         {
           price_data: {
@@ -65,15 +67,19 @@ serve(async (req) => {
               name: `Invoice #${invoice.invoice_number}`,
               description: `Payment to Sites That Slap (Gedker Ltd)`,
             },
-            unit_amount: Math.round(invoice.amount * 100), // Convert to pence
+            unit_amount: Math.round(invoice.amount * 100),
           },
           quantity: 1,
         },
       ],
       mode: 'payment',
-      success_url: `${Deno.env.get('SITE_URL')}/client?payment=success`,
-      cancel_url: `${Deno.env.get('SITE_URL')}/client?payment=cancelled`,
+      payment_intent_data: {
+        setup_future_usage: 'off_session',
+      },
+      success_url: `${siteUrl}/client?payment=success`,
+      cancel_url: `${siteUrl}/client?payment=cancelled`,
       customer_email: invoice.client?.email,
+      billing_address_collection: 'required',
       metadata: {
         invoice_id: invoiceId,
         invoice_number: invoice.invoice_number,
