@@ -141,14 +141,14 @@ export default function ClientDashboard() {
   const handlePayInvoice = async (invoiceId: string) => {
     setPayingInvoice(invoiceId)
     try {
-      const url = await createCheckoutSession(invoiceId)
+      const { url, error } = await createCheckoutSession(invoiceId)
       if (url) {
         window.location.href = url
       } else {
-        toast.error('Payment service unavailable. Please try again later.')
+        toast.error(error || 'Payment service unavailable. Please try again.')
       }
-    } catch {
-      toast.error('Failed to initiate payment.')
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to initiate payment.')
     }
     setPayingInvoice(null)
   }
