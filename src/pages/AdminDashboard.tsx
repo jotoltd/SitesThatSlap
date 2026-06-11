@@ -178,6 +178,15 @@ export default function AdminDashboard() {
   const [quoteRequests, setQuoteRequests] = useState<any[]>([])
   const [contactsLoading, setContactsLoading] = useState(false)
   const [quotesLoading, setQuotesLoading] = useState(false)
+  const [showBroadcastModal, setShowBroadcastModal] = useState(false)
+  const [broadcastSubject, setBroadcastSubject] = useState('')
+  const [broadcastMessage, setBroadcastMessage] = useState('')
+  const [broadcastTarget, setBroadcastTarget] = useState<'all' | string[]>('all')
+  const [sendingBroadcast, setSendingBroadcast] = useState(false)
+  const [globalSearch, setGlobalSearch] = useState('')
+  const [showGlobalSearch, setShowGlobalSearch] = useState(false)
+  const [editingClientNote, setEditingClientNote] = useState<string | null>(null)
+  const [clientNoteValue, setClientNoteValue] = useState('')
 
   useEffect(() => {
     fetchData()
@@ -627,6 +636,65 @@ export default function AdminDashboard() {
   }
 
   const unreadCount = messages.filter((m: Message) => m.sender === 'client' && !m.read).length
+
+  const handleInvoiceStatusToggle = async (invoice: Invoice) => {
+    const cycle: Record<string, 'pending' | 'paid' | 'overdue'> = { pending: 'paid', paid: 'overdue', overdue: 'pending' }
+    const newStatus = cycle[invoice.status]
+    await supabase.from('invoices').update({ status: newStatus }).eq('id', invoice.id)
+    logActivity('status_changed', 'invoice', invoice.id, invoice.invoice_number, `Status changed to ${newStatus}`)
+    toast.success(`Invoice marked as ${newStatus}`)
+    fetchData()
+  }
+
+  const handleSendInvoiceReminder = async (invoice: Invoice) => {
+    const client = clients.find((c: Client) => c.id === invoice.client_id)
+    if (!client) return
+    await sendEmail(client.email, `Reminder: Invoice #${invoice.invoice_number} - Sites That Slap`, invoiceNotificationEmail(client.name, invoice.invoice_number, invoice.amount))
+    toast.success(`Reminder sent to ${client.email}`)
+  }
+
+  const handleQuickProgress = async (project: Project, delta: number) => {
+    const newProgress = Math.min(100, Math.max(0, project.progress + delta))
+    await supabase.from('projects').update({ progress: newProgress }).eq('id', project.id)
+    fetchData()
+  }
+
+  const handleSaveClientNote = async (clientId: string) => {
+    await supabase.from('profiles').update({ notes: clientNoteValue }).eq('id', clientId)
+    setEditingClientNote(null)
+    toast.success('Note saved')
+    fetchData()
+  }
+
+  const handleBroadcast = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!broadcastSubject.trim() || !broadcastMessage.trim()) return
+    setSendingBroadcast(true)
+    const targets = broadcastTarget === 'all' ? clients : clients.filter((c: Client) => (broadcastTarget as string[]).includes(c.id))
+    await Promise.all(targets.map((c: Client) =>
+      sendEmail(c.email, broadcastSubject, `
+        <div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+          <h1 style="color: #FF006E;">Sites That Slap</h1>
+          <div style="background: #f9f9f9; border-radius: 12px; padding: 30px; border-left: 4px solid #FF006E;">
+            <h2>Hi ${c.name},</h2>
+            ${broadcastMessage.split('\n').map(l => `<p style="color:#444;line-height:1.6;">${l}</p>`).join('')}
+          </div>
+          <p style="color:#999;font-size:12px;text-align:center;margin-top:20px;">Sites That Slap (Gedker Ltd) &bull; Leeds, West Yorkshire</p>
+        </div>
+      `)
+    ))
+    toast.success(`Sent to ${targets.length} client${targets.length !== 1 ? 's' : ''}`)
+    setBroadcastSubject('')
+    setBroadcastMessage('')
+    setShowBroadcastModal(false)
+    setSendingBroadcast(false)
+  }
+
+  const globalSearchResults = globalSearch.trim().length > 1 ? {
+    clients: clients.filter((c: Client) => [c.name, c.email, c.company_name].some(v => v?.toLowerCase().includes(globalSearch.toLowerCase()))).slice(0, 4),
+    invoices: invoices.filter((i: Invoice) => [i.invoice_number, i.client?.name, String(i.amount)].some(v => v?.toLowerCase().includes(globalSearch.toLowerCase()))).slice(0, 4),
+    projects: projects.filter((p: Project) => [p.name, p.client?.name, p.description].some(v => v?.toLowerCase().includes(globalSearch.toLowerCase()))).slice(0, 4),
+  } : null
 
   const handleDeleteInvoice = async (id: string) => {
     if (!confirm('Delete this invoice?')) return
@@ -1248,23 +1316,58 @@ export default function AdminDashboard() {
               </div>
             </div>
             <div className="flex items-center gap-2 md:gap-4">
-              {/* Search */}
-              <div className="hidden md:flex items-center gap-2">
+              {/* Global Search */}
+              <div className="hidden md:flex items-center gap-2 relative">
                 <Search className="w-4 h-4 text-slate-400" />
                 <input
                   type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search..."
-                  className="w-40 lg:w-56 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-pink-500/50"
+                  value={globalSearch}
+                  onChange={(e) => { setGlobalSearch(e.target.value); setShowGlobalSearch(true) }}
+                  onFocus={() => setShowGlobalSearch(true)}
+                  onBlur={() => setTimeout(() => setShowGlobalSearch(false), 200)}
+                  placeholder="Global search..."
+                  className="w-48 lg:w-64 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-pink-500/50"
                 />
-                {searchTerm && (
-                  <button
-                    onClick={() => setSearchTerm('')}
-                    className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+                {globalSearch && <button onClick={() => setGlobalSearch('')} className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white"><X className="w-4 h-4" /></button>}
+                {showGlobalSearch && globalSearchResults && (
+                  <div className="absolute top-full right-0 mt-2 w-80 bg-[#0a0a1a] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden">
+                    {globalSearchResults.clients.length > 0 && (
+                      <div className="p-2">
+                        <p className="text-xs text-slate-500 font-bold px-2 py-1">CLIENTS</p>
+                        {globalSearchResults.clients.map((c: Client) => (
+                          <button key={c.id} onMouseDown={() => { setActiveTab('clients'); setSearchTerm(c.name); setGlobalSearch('') }} className="w-full flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10 text-left">
+                            <div className="w-7 h-7 rounded-lg bg-pink-500/20 flex items-center justify-center text-pink-400 text-sm font-bold">{c.name[0]}</div>
+                            <div><p className="text-white text-sm">{c.name}</p><p className="text-slate-500 text-xs">{c.email}</p></div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {globalSearchResults.invoices.length > 0 && (
+                      <div className="p-2 border-t border-white/5">
+                        <p className="text-xs text-slate-500 font-bold px-2 py-1">INVOICES</p>
+                        {globalSearchResults.invoices.map((i: Invoice) => (
+                          <button key={i.id} onMouseDown={() => { setActiveTab('invoices'); setSearchTerm(i.invoice_number); setGlobalSearch('') }} className="w-full flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10 text-left">
+                            <FileText className="w-4 h-4 text-purple-400" />
+                            <div><p className="text-white text-sm">{i.invoice_number}</p><p className="text-slate-500 text-xs">£{i.amount.toLocaleString()} · {i.client?.name}</p></div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {globalSearchResults.projects.length > 0 && (
+                      <div className="p-2 border-t border-white/5">
+                        <p className="text-xs text-slate-500 font-bold px-2 py-1">PROJECTS</p>
+                        {globalSearchResults.projects.map((p: Project) => (
+                          <button key={p.id} onMouseDown={() => { setActiveTab('projects'); setSearchTerm(p.name); setGlobalSearch('') }} className="w-full flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10 text-left">
+                            <CheckCircle className="w-4 h-4 text-cyan-400" />
+                            <div><p className="text-white text-sm">{p.name}</p><p className="text-slate-500 text-xs">{p.client?.name}</p></div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {!globalSearchResults.clients.length && !globalSearchResults.invoices.length && !globalSearchResults.projects.length && (
+                      <p className="text-slate-500 text-sm text-center py-4">No results</p>
+                    )}
+                  </div>
                 )}
               </div>
               <button onClick={() => setShowClientModal(true)} className="hidden md:flex p-2 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold text-sm items-center gap-2">
@@ -1275,6 +1378,9 @@ export default function AdminDashboard() {
               </button>
               <button onClick={() => setShowInvoiceModal(true)} className="hidden md:flex p-2 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold text-sm items-center gap-2">
                 <Plus className="w-4 h-4" /> <span className="hidden sm:inline">New Invoice</span>
+              </button>
+              <button onClick={() => setShowBroadcastModal(true)} className="hidden md:flex p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors" title="Broadcast email to clients">
+                <Send className="w-5 h-5" />
               </button>
               <NotificationBell />
               <button onClick={() => setShowSettings(true)} className="p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors">
@@ -1673,13 +1779,16 @@ export default function AdminDashboard() {
                           <td className="p-4 text-slate-300">{invoice.client?.name || 'Unknown'}</td>
                           <td className="p-4 text-white font-bold">£{invoice.amount.toLocaleString()}</td>
                           <td className="p-4">
-                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                              invoice.status === 'paid' ? 'bg-green-500/20 text-green-400' :
-                              invoice.status === 'overdue' ? 'bg-red-500/20 text-red-400' :
-                              'bg-yellow-500/20 text-yellow-400'
-                            }`}>
+                            <button
+                              onClick={() => handleInvoiceStatusToggle(invoice)}
+                              title="Click to cycle status"
+                              className={`px-3 py-1 rounded-full text-xs font-bold transition-opacity hover:opacity-70 ${
+                                invoice.status === 'paid' ? 'bg-green-500/20 text-green-400' :
+                                invoice.status === 'overdue' ? 'bg-red-500/20 text-red-400' :
+                                'bg-yellow-500/20 text-yellow-400'
+                              }`}>
                               {invoice.status}
-                            </span>
+                            </button>
                           </td>
                           <td className="p-4 text-slate-400 text-sm">{invoice.date}</td>
                           <td className="p-4">
@@ -1697,6 +1806,15 @@ export default function AdminDashboard() {
                               >
                                 <Download className="w-4 h-4" />
                               </button>
+                              {invoice.status !== 'paid' && (
+                                <button
+                                  onClick={() => handleSendInvoiceReminder(invoice)}
+                                  className="p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-cyan-400"
+                                  title="Send payment reminder"
+                                >
+                                  <Send className="w-4 h-4" />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -1827,11 +1945,31 @@ export default function AdminDashboard() {
                             </a>
                           </p>
                         )}
-                        {client.notes && (
-                          <p className="text-slate-500 text-xs italic mt-2 line-clamp-2">
-                            "{client.notes}"
-                          </p>
-                        )}
+                        <div className="mt-2">
+                          {editingClientNote === client.id ? (
+                            <div className="space-y-1">
+                              <textarea
+                                value={clientNoteValue}
+                                onChange={(e) => setClientNoteValue(e.target.value)}
+                                rows={2}
+                                placeholder="Internal note..."
+                                className="w-full px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white text-xs resize-none focus:outline-none focus:border-pink-500/50"
+                                autoFocus
+                              />
+                              <div className="flex gap-1">
+                                <button onClick={() => handleSaveClientNote(client.id)} className="px-2 py-1 rounded bg-pink-500 text-white text-xs font-bold">Save</button>
+                                <button onClick={() => setEditingClientNote(null)} className="px-2 py-1 rounded bg-white/5 text-slate-400 text-xs">Cancel</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => { setEditingClientNote(client.id); setClientNoteValue(client.notes || '') }}
+                              className="text-xs text-slate-500 hover:text-slate-300 italic transition-colors text-left w-full"
+                            >
+                              {client.notes ? `"${client.notes}"` : '+ Add internal note...'}
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </motion.div>
                   ))}
@@ -1909,7 +2047,11 @@ export default function AdminDashboard() {
                         />
                       </div>
                       <div className="flex items-center justify-between text-sm mb-4">
-                        <span className="text-slate-400">{project.progress}% Complete</span>
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => handleQuickProgress(project, -5)} className="w-6 h-6 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center text-xs font-bold">−</button>
+                          <span className="text-slate-400">{project.progress}%</span>
+                          <button onClick={() => handleQuickProgress(project, 5)} className="w-6 h-6 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center text-xs font-bold">+</button>
+                        </div>
                         <span className="text-slate-400">Due: {project.deadline}</span>
                       </div>
 
@@ -2737,6 +2879,52 @@ export default function AdminDashboard() {
           )}
         </main>
       </div>
+
+      {/* Broadcast Email Modal */}
+      <AnimatePresence>
+        {showBroadcastModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+            onClick={() => setShowBroadcastModal(false)}>
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              className="glass-neon rounded-2xl p-6 w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-xl font-black text-white">Broadcast Email</h2>
+                <button onClick={() => setShowBroadcastModal(false)} className="p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+              </div>
+              <form onSubmit={handleBroadcast} className="space-y-4">
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Recipients</label>
+                  <select
+                    onChange={(e) => setBroadcastTarget(e.target.value === 'all' ? 'all' : [e.target.value])}
+                    className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-pink-500/50"
+                  >
+                    <option value="all">All Clients ({clients.length})</option>
+                    {clients.map((c: Client) => (
+                      <option key={c.id} value={c.id}>{c.name} — {c.email}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Subject</label>
+                  <input type="text" required value={broadcastSubject} onChange={(e) => setBroadcastSubject(e.target.value)} placeholder="Email subject..." className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-pink-500/50" />
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Message</label>
+                  <textarea required rows={5} value={broadcastMessage} onChange={(e) => setBroadcastMessage(e.target.value)} placeholder="Write your message..." className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white resize-none focus:outline-none focus:border-pink-500/50" />
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button type="button" onClick={() => setShowBroadcastModal(false)} className="flex-1 px-4 py-3 rounded-xl bg-white/5 text-white font-bold hover:bg-white/10">Cancel</button>
+                  <button type="submit" disabled={sendingBroadcast} className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold disabled:opacity-50 flex items-center justify-center gap-2">
+                    {sendingBroadcast ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    {sendingBroadcast ? 'Sending...' : 'Send Broadcast'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Settings Modal */}
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
