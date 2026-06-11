@@ -3,7 +3,25 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Stripe from 'https://esm.sh/stripe@14.14.0?target=deno'
 
 serve(async (req) => {
-  const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!, {
+  const supabaseClient = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  )
+
+  const { data: modeSetting } = await supabaseClient
+    .from('app_settings')
+    .select('value')
+    .eq('key', 'stripe_mode')
+    .single()
+  const mode = modeSetting?.value || 'sandbox'
+  const secretKey = mode === 'live'
+    ? Deno.env.get('STRIPE_SECRET_KEY_LIVE')!
+    : Deno.env.get('STRIPE_SECRET_KEY_SANDBOX')!
+  const webhookSecret = mode === 'live'
+    ? Deno.env.get('STRIPE_WEBHOOK_SECRET_LIVE')!
+    : Deno.env.get('STRIPE_WEBHOOK_SECRET_SANDBOX')!
+
+  const stripe = new Stripe(secretKey, {
     apiVersion: '2023-10-16',
   })
 
@@ -16,16 +34,11 @@ serve(async (req) => {
     event = stripe.webhooks.constructEvent(
       body,
       signature,
-      Deno.env.get('STRIPE_WEBHOOK_SECRET')!
+      webhookSecret
     )
   } catch (err) {
-    return new Response(`Webhook Error: ${err.message}`, { status: 400 })
+    return new Response(`Webhook Error: ${(err as Error).message}`, { status: 400 })
   }
-
-  const supabaseClient = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  )
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session

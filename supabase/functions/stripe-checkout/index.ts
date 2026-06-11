@@ -13,14 +13,23 @@ serve(async (req) => {
   }
 
   try {
-    const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!, {
-      apiVersion: '2023-10-16',
-    })
-
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
+
+    const { data: modeSetting } = await supabaseClient
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'stripe_mode')
+      .single()
+    const mode = modeSetting?.value || 'sandbox'
+    const secretKey = mode === 'live'
+      ? Deno.env.get('STRIPE_SECRET_KEY_LIVE')!
+      : Deno.env.get('STRIPE_SECRET_KEY_SANDBOX')!
+    const stripe = new Stripe(secretKey, {
+      apiVersion: '2023-10-16',
+    })
 
     const { invoiceId } = await req.json()
 

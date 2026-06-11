@@ -191,6 +191,8 @@ export default function AdminDashboard() {
   const [showGlobalSearch, setShowGlobalSearch] = useState(false)
   const [editingClientNote, setEditingClientNote] = useState<string | null>(null)
   const [clientNoteValue, setClientNoteValue] = useState('')
+  const [stripeMode, setStripeMode] = useState<'sandbox' | 'live'>('sandbox')
+  const [savingStripeMode, setSavingStripeMode] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -221,6 +223,21 @@ export default function AdminDashboard() {
     if (activeTab === 'quotes') fetchQuotes()
     if (activeTab === 'recurring') fetchRecurringPlans()
   }, [activeTab])
+
+  useEffect(() => { fetchStripeMode() }, [])
+
+  const fetchStripeMode = async () => {
+    const { data } = await supabase.from('app_settings').select('value').eq('key', 'stripe_mode').single()
+    if (data?.value) setStripeMode(data.value as 'sandbox' | 'live')
+  }
+
+  const handleSaveStripeMode = async (mode: 'sandbox' | 'live') => {
+    setSavingStripeMode(true)
+    setStripeMode(mode)
+    await supabase.from('app_settings').upsert({ key: 'stripe_mode', value: mode, updated_at: new Date().toISOString() })
+    toast.success(`Stripe switched to ${mode === 'live' ? '🟢 Live' : '🟡 Sandbox'} mode`)
+    setSavingStripeMode(false)
+  }
 
   const fetchRecurringPlans = async () => {
     setRecurringLoading(true)
@@ -1738,6 +1755,47 @@ export default function AdminDashboard() {
                   </ResponsiveContainer>
                 </motion.div>
               </div>
+
+              {/* Stripe Mode Toggle */}
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }} className="glass-neon rounded-2xl p-6">
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${stripeMode === 'live' ? 'bg-green-500/20' : 'bg-yellow-500/20'}`}>
+                      <DollarSign className={`w-5 h-5 ${stripeMode === 'live' ? 'text-green-400' : 'text-yellow-400'}`} />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-white">Stripe Payments</h3>
+                      <p className="text-sm text-slate-400">
+                        Currently in <span className={`font-bold ${stripeMode === 'live' ? 'text-green-400' : 'text-yellow-400'}`}>{stripeMode === 'live' ? '🟢 Live' : '🟡 Sandbox'}</span> mode
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleSaveStripeMode('sandbox')}
+                      disabled={savingStripeMode || stripeMode === 'sandbox'}
+                      className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${stripeMode === 'sandbox' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white'}`}
+                    >
+                      🟡 Sandbox
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (!confirm('⚠️ Switch to LIVE mode?\n\nReal money will be charged to clients. Make sure your live Stripe keys are set in Supabase secrets.')) return
+                        handleSaveStripeMode('live')
+                      }}
+                      disabled={savingStripeMode || stripeMode === 'live'}
+                      className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${stripeMode === 'live' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-white/5 text-slate-400 hover:bg-green-500/10 hover:text-green-400'}`}
+                    >
+                      🟢 Live
+                    </button>
+                  </div>
+                </div>
+                {stripeMode === 'live' && (
+                  <p className="mt-3 text-xs text-red-400/80 bg-red-500/10 rounded-lg px-3 py-2">
+                    ⚠️ Live mode active — real payments are being processed
+                  </p>
+                )}
+              </motion.div>
 
               {/* Recent Activity */}
               <div className="glass-neon rounded-2xl p-6">
