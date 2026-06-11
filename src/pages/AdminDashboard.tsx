@@ -17,7 +17,7 @@ import {
 } from 'lucide-react'
 import { NotificationBell } from '../components/Notifications'
 import SettingsModal from '../components/SettingsModal'
-import ActivityLog from '../components/ActivityLog'
+import ActivityLog, { useActivityLog } from '../components/ActivityLog'
 import { sendEmail, clientWelcomeEmail, invoiceNotificationEmail } from '../lib/email'
 
 interface Client {
@@ -136,6 +136,7 @@ const credentialTypeLabels: Record<string, string> = {
 
 export default function AdminDashboard() {
   const { user, logout, setSuppressAuthChange } = useAuth()
+  const { logActivity } = useActivityLog()
   const [activeTab, setActiveTab] = useState<'overview' | 'clients' | 'invoices' | 'projects' | 'messages' | 'calendar' | 'kanban' | 'activity' | 'quotes' | 'contacts'>('overview')
   const [showSettings, setShowSettings] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
@@ -244,6 +245,7 @@ export default function AdminDashboard() {
       content: newAdminMessage.trim() || (file_name ? `Sent a file: ${file_name}` : ''),
       file_url, file_name, file_type
     })
+    logActivity('messaged', 'message', selectedClientForMessages, '', adminAttachment ? 'Sent file attachment' : 'Sent message')
     setNewAdminMessage('')
     setAdminAttachment(null)
     fetchData()
@@ -633,6 +635,7 @@ export default function AdminDashboard() {
       toast.error('Failed to delete invoice')
     } else {
       toast.success('Invoice deleted')
+      logActivity('deleted', 'invoice', id, '', 'Invoice deleted')
     }
     fetchData()
   }
@@ -646,6 +649,7 @@ export default function AdminDashboard() {
       toast.error('Failed to delete client: ' + error.message)
     } else {
       toast.success('Client deleted')
+      logActivity('deleted', 'client', id, name, 'Client account deleted')
       fetchData()
     }
   }
@@ -676,6 +680,7 @@ export default function AdminDashboard() {
       toast.error('Failed to update client')
     } else {
       toast.success('Client updated')
+      logActivity('updated', 'client', editingClient.id, editingClient.name, 'Client details updated')
       setEditingClient(null)
       fetchData()
     }
@@ -958,6 +963,7 @@ export default function AdminDashboard() {
       toast.error('Invoice created but failed to add line items')
     } else {
       toast.success('Invoice created successfully')
+      logActivity('created', 'invoice', invoiceData.id, invoiceNumber, `Invoice for £${totalAmount.toLocaleString()}`)
       // Send invoice notification email to client
       const client = clients.find((c: Client) => c.id === clientId)
       if (client) {
@@ -1000,11 +1006,12 @@ export default function AdminDashboard() {
       github_branch: formData.get('github_branch') as string || 'main'
     }
 
-    const { error } = await supabase.from('projects').insert(newProject)
+    const { data: projData, error } = await supabase.from('projects').insert(newProject).select().single()
     if (error) {
       toast.error('Failed to create project')
     } else {
       toast.success('Project created successfully')
+      logActivity('created', 'project', projData?.id || '', newProject.name, 'New project created')
     }
     setShowProjectModal(false)
     fetchData()
@@ -1130,6 +1137,7 @@ export default function AdminDashboard() {
       } else {
         toast.success(`Client "${name}" created! Welcome email sent. They'll need to confirm their email first.`)
       }
+      logActivity('created', 'client', authData.user?.id || '', name, `New client account created`)
 
       setShowClientModal(false)
       form.reset()
@@ -1150,6 +1158,7 @@ export default function AdminDashboard() {
       toast.error('Failed to delete project')
     } else {
       toast.success('Project deleted')
+      logActivity('deleted', 'project', id, '', 'Project deleted')
     }
     fetchData()
   }
@@ -1169,6 +1178,7 @@ export default function AdminDashboard() {
     }
 
     await supabase.from('projects').update(updates).eq('id', editingProject.id)
+    logActivity('updated', 'project', editingProject.id, updates.name, `Project updated`)
     setEditingProject(null)
     fetchData()
   }
@@ -2472,6 +2482,7 @@ export default function AdminDashboard() {
                           toast.error('Failed to update project')
                         } else {
                           toast.success(`"${project.name}" moved to ${column.label}`)
+                          logActivity('status_changed', 'project', project.id, project.name, `Moved to ${column.label}`)
                           fetchData()
                         }
                       }}
