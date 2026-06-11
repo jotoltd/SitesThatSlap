@@ -2,10 +2,13 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
+import { createCheckoutSession } from '../lib/stripe'
 import { jsPDF } from 'jspdf'
+import { toast } from 'sonner'
 import { 
   FileText, CreditCard, MessageSquare, CheckCircle2, 
-  Clock, Download, LogOut, User, Loader2, Send, Settings
+  Clock, Download, LogOut, User, Loader2, Send, Settings,
+  Github, CalendarDays, ChevronDown, ChevronUp, Paperclip, X, FileIcon, Target
 } from 'lucide-react'
 import { NotificationBell } from '../components/Notifications'
 import SettingsModal from '../components/SettingsModal'
@@ -17,6 +20,16 @@ interface Project {
   progress: number
   deadline: string
   description?: string
+  github_repo_url?: string
+}
+
+interface ProjectSummary {
+  id: string
+  project_id: string
+  summary: string
+  commit_count: number
+  date: string
+  created_at: string
 }
 
 interface Invoice {
@@ -35,6 +48,9 @@ interface Message {
   content: string
   read: boolean
   created_at: string
+  file_url?: string
+  file_name?: string
+  file_type?: string
 }
 
 export default function ClientDashboard() {
@@ -45,8 +61,12 @@ export default function ClientDashboard() {
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [messages, setMessages] = useState<Message[]>([])
   const [newMessage, setNewMessage] = useState('')
+  const [clientAttachment, setClientAttachment] = useState<File | null>(null)
   const [loading, setLoading] = useState(true)
   const [payingInvoice, setPayingInvoice] = useState<string | null>(null)
+  const [summaries, setSummaries] = useState<Record<string, ProjectSummary[]>>({})
+  const [expandedProject, setExpandedProject] = useState<string | null>(null)
+  const [projectMilestones, setProjectMilestones] = useState<Record<string, any[]>>({})
 
   useEffect(() => {
     if (user) {
@@ -72,35 +92,84 @@ export default function ClientDashboard() {
   }, [user])
 
   const fetchData = async () => {
+    if (!user?.id) return
     setLoading(true)
     const [{ data: projectsData }, { data: invoicesData }, { data: messagesData }] = await Promise.all([
-      supabase.from('projects').select('*').eq('client_id', user?.id).order('created_at', { ascending: false }),
-      supabase.from('invoices').select('*').eq('client_id', user?.id).order('created_at', { ascending: false }),
-      supabase.from('messages').select('*').eq('client_id', user?.id).order('created_at', { ascending: true })
+      supabase.from('projects').select('*').eq('client_id', user.id).order('created_at', { ascending: false }),
+      supabase.from('invoices').select('*').eq('client_id', user.id).order('created_at', { ascending: false }),
+      supabase.from('messages').select('*').eq('client_id', user.id).order('created_at', { ascending: true })
     ])
     setProjects(projectsData || [])
     setInvoices(invoicesData || [])
     setMessages(messagesData || [])
     setLoading(false)
+
+    // Fetch summaries and milestones for all projects
+    const projectIds = (projectsData || []).map((p: Project) => p.id).filter(Boolean)
+    if (projectIds.length > 0) {
+      const [{ data: summaryData }, { data: milestoneData }] = await Promise.all([
+        supabase.from('project_summaries').select('*').in('project_id', projectIds).order('date', { ascending: false }).limit(100),
+        supabase.from('project_milestones').select('*').in('project_id', projectIds).order('sort_order')
+      ])
+      
+      if (summaryData) {
+        const grouped: Record<string, ProjectSummary[]> = {}
+        summaryData.forEach((s: ProjectSummary) => {
+          if (!grouped[s.project_id]) grouped[s.project_id] = []
+          grouped[s.project_id].push(s)
+        })
+        setSummaries(grouped)
+      }
+      if (milestoneData) {
+        const grouped: Record<string, any[]> = {}
+        milestoneData.forEach((m: any) => {
+          if (!grouped[m.project_id]) grouped[m.project_id] = []
+          grouped[m.project_id].push(m)
+        })
+        setProjectMilestones(grouped)
+      }
+    }
   }
 
   const handlePayInvoice = async (invoiceId: string) => {
     setPayingInvoice(invoiceId)
-    await supabase.from('invoices').update({ status: 'paid' }).eq('id', invoiceId)
-    await fetchData()
+    try {
+      const url = await createCheckoutSession(invoiceId)
+      if (url) {
+        window.location.href = url
+      } else {
+        toast.error('Payment service unavailable. Please try again later.')
+      }
+    } catch {
+      toast.error('Failed to initiate payment.')
+    }
     setPayingInvoice(null)
   }
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newMessage.trim() || !user) return
+    if ((!newMessage.trim() && !clientAttachment) || !user) return
+    
+    let file_url = null, file_name = null, file_type = null
+    if (clientAttachment) {
+      const ext = clientAttachment.name.split('.').pop()
+      const path = `chat/${user.id}/${Date.now()}.${ext}`
+      const { error: upErr } = await supabase.storage.from('project-files').upload(path, clientAttachment)
+      if (upErr) { toast.error('Failed to upload file'); return }
+      const { data: urlData } = supabase.storage.from('project-files').getPublicUrl(path)
+      file_url = urlData.publicUrl
+      file_name = clientAttachment.name
+      file_type = clientAttachment.type
+    }
     
     await supabase.from('messages').insert({
       client_id: user.id,
       sender: 'client',
-      content: newMessage.trim()
+      content: newMessage.trim() || (file_name ? `Sent a file: ${file_name}` : ''),
+      file_url, file_name, file_type
     })
     setNewMessage('')
+    setClientAttachment(null)
     fetchData()
   }
 
@@ -247,7 +316,14 @@ export default function ClientDashboard() {
           {(['projects', 'invoices', 'messages'] as const).map((tab) => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={async () => {
+                setActiveTab(tab)
+                if (tab === 'messages' && user) {
+                  await supabase.from('messages').update({ read: true }).eq('client_id', user.id).eq('sender', 'admin').eq('read', false)
+                  await supabase.from('notifications').delete().eq('user_id', user.id).ilike('title', '%message%')
+                  fetchData()
+                }
+              }}
               className={`px-6 py-3 rounded-xl font-semibold capitalize transition-all ${
                 activeTab === tab 
                   ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white' 
@@ -271,35 +347,106 @@ export default function ClientDashboard() {
               ) : projects.length === 0 ? (
                 <p className="text-slate-400 text-center py-8">No projects yet</p>
               ) : (
-                projects.map((project: Project) => (
-                  <motion.div
-                    key={project.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="p-4 rounded-xl bg-white/5 border border-white/10"
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-bold text-white">{project.name}</h3>
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                        project.status === 'in_progress' ? 'bg-yellow-500/20 text-yellow-400' :
-                        project.status === 'review' ? 'bg-blue-500/20 text-blue-400' :
-                        'bg-green-500/20 text-green-400'
-                      }`}>
-                        {project.status.replace('_', ' ')}
-                      </span>
-                    </div>
-                    <div className="w-full h-2 bg-slate-700 rounded-full overflow-hidden mb-3">
-                      <div 
-                        className="h-full bg-gradient-to-r from-pink-500 to-cyan-500 rounded-full"
-                        style={{ width: `${project.progress}%` }}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between text-sm text-slate-400">
-                      <span>{project.progress}% Complete</span>
-                      <span>Due: {project.deadline}</span>
-                    </div>
-                  </motion.div>
-                ))
+                projects.map((project: Project) => {
+                  const projectSummaries = summaries[project.id] || []
+                  const isExpanded = expandedProject === project.id
+                  return (
+                    <motion.div
+                      key={project.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="rounded-xl bg-white/5 border border-white/10 overflow-hidden"
+                    >
+                      <div className="p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <h3 className="font-bold text-white">{project.name}</h3>
+                            {project.github_repo_url && (
+                              <a
+                                href={project.github_repo_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-slate-400 hover:text-white transition-colors"
+                                title="View on GitHub"
+                              >
+                                <Github className="w-4 h-4" />
+                              </a>
+                            )}
+                          </div>
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                            project.status === 'in_progress' ? 'bg-yellow-500/20 text-yellow-400' :
+                            project.status === 'review' ? 'bg-blue-500/20 text-blue-400' :
+                            project.status === 'completed' ? 'bg-green-500/20 text-green-400' :
+                            'bg-slate-500/20 text-slate-400'
+                          }`}>
+                            {project.status.replace('_', ' ')}
+                          </span>
+                        </div>
+                        {project.description && (
+                          <p className="text-sm text-slate-400 mb-3">{project.description}</p>
+                        )}
+                        <div className="w-full h-2 bg-slate-700 rounded-full overflow-hidden mb-3">
+                          <div 
+                            className="h-full bg-gradient-to-r from-pink-500 to-cyan-500 rounded-full transition-all duration-500"
+                            style={{ width: `${project.progress}%` }}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between text-sm text-slate-400">
+                          <span>{project.progress}% Complete</span>
+                          <span>Due: {project.deadline}</span>
+                        </div>
+
+                        {/* Milestones */}
+                        {(projectMilestones[project.id] || []).length > 0 && (
+                          <div className="mt-3 space-y-1.5">
+                            <p className="text-xs text-slate-500 font-bold flex items-center gap-1"><Target className="w-3 h-3" /> Milestones</p>
+                            {(projectMilestones[project.id] || []).map((m: any) => (
+                              <div key={m.id} className="flex items-center gap-2">
+                                <div className={`w-4 h-4 rounded-md flex items-center justify-center ${m.status === 'completed' ? 'bg-green-500' : 'border border-white/20'}`}>
+                                  {m.status === 'completed' && <CheckCircle2 className="w-3 h-3 text-white" />}
+                                </div>
+                                <span className={`text-sm ${m.status === 'completed' ? 'text-slate-500 line-through' : 'text-slate-300'}`}>{m.title}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Daily Updates Toggle */}
+                        {projectSummaries.length > 0 && (
+                          <button
+                            onClick={() => setExpandedProject(isExpanded ? null : project.id)}
+                            className="mt-3 flex items-center gap-2 text-sm text-pink-400 hover:text-pink-300 transition-colors"
+                          >
+                            <CalendarDays className="w-4 h-4" />
+                            Daily Updates ({projectSummaries.length})
+                            {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Expanded Daily Summaries */}
+                      {isExpanded && projectSummaries.length > 0 && (
+                        <div className="border-t border-white/10 bg-white/[0.02]">
+                          <div className="p-4 space-y-4 max-h-96 overflow-y-auto">
+                            {projectSummaries.slice(0, 14).map((s) => (
+                              <div key={s.id} className="relative pl-6">
+                                <div className="absolute left-0 top-1 w-3 h-3 rounded-full bg-gradient-to-r from-pink-500 to-purple-500" />
+                                <div className="absolute left-[5px] top-4 w-[2px] h-[calc(100%+8px)] bg-white/10 last:hidden" />
+                                <p className="text-xs text-slate-500 mb-1">
+                                  {new Date(s.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' })}
+                                  {s.commit_count > 0 && (
+                                    <span className="ml-2 text-pink-400/60">{s.commit_count} update{s.commit_count === 1 ? '' : 's'}</span>
+                                  )}
+                                </p>
+                                <p className="text-sm text-slate-300 whitespace-pre-line leading-relaxed">{s.summary}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </motion.div>
+                  )
+                })
               )}
             </div>
           )}
@@ -392,7 +539,20 @@ export default function ClientDashboard() {
                           ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-br-md' 
                           : 'bg-white/10 text-white rounded-bl-md'
                       }`}>
-                        <p>{message.content}</p>
+                        {message.file_url && (
+                          message.file_type?.startsWith('image/') ? (
+                            <a href={message.file_url} target="_blank" rel="noopener noreferrer">
+                              <img src={message.file_url} alt={message.file_name} className="max-w-[300px] rounded-lg mb-2 hover:opacity-80 transition-opacity" />
+                            </a>
+                          ) : (
+                            <a href={message.file_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-2 rounded-lg bg-black/20 mb-2 hover:bg-black/30 transition-colors">
+                              <FileIcon className="w-4 h-4 shrink-0" />
+                              <span className="text-sm truncate">{message.file_name}</span>
+                              <Download className="w-3.5 h-3.5 shrink-0 ml-auto" />
+                            </a>
+                          )
+                        )}
+                        {message.content && !message.content.startsWith('Sent a file:') && <p>{message.content}</p>}
                         <p className={`text-xs mt-1 ${message.sender === 'client' ? 'text-white/70' : 'text-slate-400'}`}>
                           {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           {message.sender === 'admin' && !message.read && (
@@ -406,22 +566,35 @@ export default function ClientDashboard() {
               </div>
 
               {/* Message Input */}
-              <form onSubmit={handleSendMessage} className="flex gap-2">
-                <input
-                  type="text"
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Type a message..."
-                  className="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-pink-500/50"
-                />
-                <button
-                  type="submit"
-                  disabled={!newMessage.trim()}
-                  className="px-4 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold disabled:opacity-50"
-                >
-                  <Send className="w-5 h-5" />
-                </button>
-              </form>
+              <div>
+                {clientAttachment && (
+                  <div className="flex items-center gap-2 mb-2 p-2 rounded-lg bg-white/5">
+                    <Paperclip className="w-4 h-4 text-pink-400" />
+                    <span className="text-sm text-slate-300 truncate flex-1">{clientAttachment.name}</span>
+                    <button onClick={() => setClientAttachment(null)} className="text-slate-400 hover:text-red-400"><X className="w-4 h-4" /></button>
+                  </div>
+                )}
+                <form onSubmit={handleSendMessage} className="flex gap-2">
+                  <label className="px-3 py-3 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 cursor-pointer transition-colors">
+                    <Paperclip className="w-5 h-5" />
+                    <input type="file" className="hidden" onChange={(e) => { if (e.target.files?.[0]) setClientAttachment(e.target.files[0]) }} />
+                  </label>
+                  <input
+                    type="text"
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Type a message..."
+                    className="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-pink-500/50"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!newMessage.trim() && !clientAttachment}
+                    className="px-4 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold disabled:opacity-50"
+                  >
+                    <Send className="w-5 h-5" />
+                  </button>
+                </form>
+              </div>
             </div>
           )}
         </div>

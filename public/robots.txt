@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /client
+Disallow: /login
+
+Sitemap: https://www.sitesthatslap.com/sitemap.xml

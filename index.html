@@ -6,6 +6,55 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Sites That Slap | Bold Web Design Leeds</title>
     <meta name="description" content="Sites That Slap - Cool, modern, big and bold web design solutions for all types of businesses. Based in Leeds, West Yorkshire." />
+    <meta name="keywords" content="web design leeds, web development, website design, ecommerce, booking systems, raffle websites, SEO, brand identity, West Yorkshire" />
+    <meta name="author" content="Joto Ltd" />
+    <link rel="canonical" href="https://www.sitesthatslap.com" />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#07070f" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Sites That Slap" />
+    <link rel="apple-touch-icon" href="/icon-192.svg" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://www.sitesthatslap.com" />
+    <meta property="og:title" content="Sites That Slap | Bold Web Design Leeds" />
+    <meta property="og:description" content="We build websites that slap. Bold, modern web design for businesses that want to stand out. Based in Leeds, West Yorkshire." />
+    <meta property="og:image" content="https://www.sitesthatslap.com/og-image.png" />
+    <meta property="og:site_name" content="Sites That Slap" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Sites That Slap | Bold Web Design Leeds" />
+    <meta name="twitter:description" content="We build websites that slap. Bold, modern web design for businesses that want to stand out." />
+    <meta name="twitter:image" content="https://www.sitesthatslap.com/og-image.png" />
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebDesignCompany",
+      "name": "Sites That Slap",
+      "legalName": "Joto Ltd",
+      "url": "https://www.sitesthatslap.com",
+      "email": "hello@sitesthatslap.com",
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Leeds",
+        "addressRegion": "West Yorkshire",
+        "addressCountry": "GB"
+      },
+      "sameAs": [
+        "https://www.tiktok.com/@sitesthatslap",
+        "https://www.facebook.com/sitesthatslap",
+        "https://www.instagram.com/sitesthatslap"
+      ],
+      "serviceType": ["Web Design", "Web Development", "E-Commerce", "SEO", "Brand Identity"]
+    }
+    </script>
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -21,5 +70,10 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'))
+      }
+    </script>
   </body>
 </html>

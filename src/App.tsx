@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useLocation, Link } from 'react-router-dom'
 import { Toaster, toast } from 'sonner'
 import { supabase } from './lib/supabase'
+import { sendEmail, contactAutoReplyEmail } from './lib/email'
 import {
   Rocket, Palette, Zap, Globe, Smartphone, ShoppingCart, ArrowRight, Star,
   MapPin, Mail, Phone, Menu, X, MessageCircle,
@@ -39,26 +40,28 @@ function LoadingScreen({ onComplete }: { onComplete: () => void }) {
       initial={{ opacity: 1 }}
       exit={{ opacity: 0, transition: { duration: 0.6 } }}
     >
-      <div className="relative flex flex-col items-center gap-8">
-        <motion.div
-          className="w-28 h-28 rounded-full"
-          style={{
-            border: '3px solid transparent',
-            borderTopColor: '#FF006E',
-            borderRightColor: '#8338EC',
-            borderBottomColor: '#3A86FF',
-          }}
-          animate={{ rotate: 360 }}
-          transition={{ duration: 0.9, repeat: Infinity, ease: 'linear' }}
-        />
-        <motion.div
-          className="absolute top-0 left-0 w-28 h-28 flex items-center justify-center"
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ delay: 0.4 }}
-        >
-          <span className="text-white font-black text-5xl" style={{ fontFamily: 'Orbitron, sans-serif' }}>S</span>
-        </motion.div>
+      <div className="flex flex-col items-center gap-8">
+        <div className="relative w-28 h-28">
+          <motion.div
+            className="w-28 h-28 rounded-full"
+            style={{
+              border: '3px solid transparent',
+              borderTopColor: '#FF006E',
+              borderRightColor: '#8338EC',
+              borderBottomColor: '#3A86FF',
+            }}
+            animate={{ rotate: 360 }}
+            transition={{ duration: 0.9, repeat: Infinity, ease: 'linear' }}
+          />
+          <motion.div
+            className="absolute inset-0 flex items-center justify-center"
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: 0.4 }}
+          >
+            <span className="text-white font-black text-5xl" style={{ fontFamily: 'Orbitron, sans-serif' }}>S</span>
+          </motion.div>
+        </div>
         <div className="flex flex-col items-center gap-2">
           <motion.p
             className="neon-text-pink font-black text-4xl tracking-wider"
@@ -131,7 +134,10 @@ function Navbar() {
           <a href="#contact" onClick={(e) => { e.preventDefault(); scrollToSection('#contact'); }} className="text-sm font-semibold text-slate-300 hover:text-white transition-colors">
             Contact
           </a>
-          <Link to="/login" className="px-5 py-2 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold text-sm hover:scale-105 transition-transform">
+          <Link to="/quote" className="px-5 py-2 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold text-sm hover:scale-105 transition-transform">
+            Get a Quote
+          </Link>
+          <Link to="/login" className="text-sm font-semibold text-slate-400 hover:text-white transition-colors">
             Client Login
           </Link>
         </div>
@@ -180,7 +186,10 @@ function Navbar() {
             <a href="#contact" onClick={(e) => { e.preventDefault(); scrollToSection('#contact'); }} className="text-lg font-semibold text-slate-300 hover:text-white transition-colors">
               Contact
             </a>
-            <Link to="/login" className="px-5 py-3 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold text-center" onClick={() => setIsOpen(false)}>
+            <Link to="/quote" className="px-5 py-3 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold text-center" onClick={() => setIsOpen(false)}>
+              Get a Quote
+            </Link>
+            <Link to="/login" className="text-lg font-semibold text-slate-400 hover:text-white transition-colors text-center" onClick={() => setIsOpen(false)}>
               Client Login
             </Link>
           </div>
@@ -192,14 +201,6 @@ function Navbar() {
 
 // ── Hero Section ─────────────────────────────────────────────────────────────
 function HeroSection() {
-  const scrollToContact = () => {
-    document.querySelector('#contact')?.scrollIntoView({ behavior: 'smooth' })
-  }
-
-  const scrollToWork = () => {
-    document.querySelector('#work')?.scrollIntoView({ behavior: 'smooth' })
-  }
-
   return (
     <section id="hero" className="min-h-screen neon-grid scanlines bg-[#07070f] flex items-center justify-center pt-20">
       <NeonOrbs />
@@ -582,6 +583,8 @@ function ContactSection() {
       toast.error('Failed to send message. Please try again.')
     } else {
       toast.success('Message sent! We\'ll be in touch soon.')
+      // Send auto-reply email (fire and forget)
+      sendEmail(formData.email, 'We received your message - Sites That Slap', contactAutoReplyEmail(formData.name))
       setFormData({ name: '', email: '', message: '' })
     }
     setSubmitting(false)

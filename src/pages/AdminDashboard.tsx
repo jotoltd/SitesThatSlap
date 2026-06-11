@@ -6,17 +6,19 @@ import { jsPDF } from 'jspdf'
 import { toast } from 'sonner'
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  PieChart, Pie, Cell 
+  PieChart, Pie, Cell, LineChart, Line, Area, AreaChart 
 } from 'recharts'
 import { 
   Users, FileText, Plus, LogOut, DollarSign, TrendingUp,
   CheckCircle, XCircle, Clock, Send, Trash2, Edit2,
   Search, Filter, Download, Menu, X, Loader2, MessageSquare, Upload,
-  CalendarDays, LayoutGrid, Github, Settings, Activity
+  CalendarDays, LayoutGrid, Github, Settings, Activity,
+  KeyRound, Eye, EyeOff, Copy, Paperclip, FileIcon, Target
 } from 'lucide-react'
 import { NotificationBell } from '../components/Notifications'
 import SettingsModal from '../components/SettingsModal'
 import ActivityLog from '../components/ActivityLog'
+import { sendEmail, clientWelcomeEmail, invoiceNotificationEmail } from '../lib/email'
 
 interface Client {
   id: string
@@ -83,6 +85,9 @@ interface Message {
   read: boolean
   created_at: string
   client?: Client
+  file_url?: string
+  file_name?: string
+  file_type?: string
 }
 
 interface ProjectFile {
@@ -102,6 +107,31 @@ interface ProjectComment {
   type: 'comment' | 'status_change' | 'file_upload' | 'milestone'
   created_at: string
   user?: Client
+}
+
+interface Credential {
+  id: string
+  client_id: string
+  label: string
+  credential_type: 'api_key' | 'password' | 'token' | 'ssh_key' | 'hosting' | 'domain' | 'database' | 'email' | 'other'
+  value: string
+  username?: string
+  url?: string
+  notes?: string
+  created_at: string
+  updated_at: string
+}
+
+const credentialTypeLabels: Record<string, string> = {
+  api_key: 'API Key',
+  password: 'Password',
+  token: 'Token',
+  ssh_key: 'SSH Key',
+  hosting: 'Hosting',
+  domain: 'Domain',
+  database: 'Database',
+  email: 'Email',
+  other: 'Other',
 }
 
 export default function AdminDashboard() {
@@ -137,6 +167,16 @@ export default function AdminDashboard() {
   const [projectSummaries, setProjectSummaries] = useState<ProjectSummary[]>([])
   const [githubLoading, setGithubLoading] = useState(false)
   const [githubToken, setGithubToken] = useState('')
+  const [selectedProjectForCreds, setSelectedProjectForCreds] = useState<string | null>(null)
+  const [credentials, setCredentials] = useState<Credential[]>([])
+  const [showAddCred, setShowAddCred] = useState(false)
+  const [visibleCreds, setVisibleCreds] = useState<Set<string>>(new Set())
+  const [adminAttachment, setAdminAttachment] = useState<File | null>(null)
+  const [milestones, setMilestones] = useState<any[]>([])
+  const [contactSubmissions, setContactSubmissions] = useState<any[]>([])
+  const [quoteRequests, setQuoteRequests] = useState<any[]>([])
+  const [contactsLoading, setContactsLoading] = useState(false)
+  const [quotesLoading, setQuotesLoading] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -162,6 +202,11 @@ export default function AdminDashboard() {
     }
   }, [])
 
+  useEffect(() => {
+    if (activeTab === 'contacts') fetchContacts()
+    if (activeTab === 'quotes') fetchQuotes()
+  }, [activeTab])
+
   const fetchData = async () => {
     setLoading(true)
     const [{ data: clientsData }, { data: invoicesData }, { data: projectsData }, { data: messagesData }] = await Promise.all([
@@ -179,14 +224,28 @@ export default function AdminDashboard() {
 
   const handleSendAdminMessage = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newAdminMessage.trim() || !selectedClientForMessages) return
+    if ((!newAdminMessage.trim() && !adminAttachment) || !selectedClientForMessages) return
+    
+    let file_url = null, file_name = null, file_type = null
+    if (adminAttachment) {
+      const ext = adminAttachment.name.split('.').pop()
+      const path = `chat/${selectedClientForMessages}/${Date.now()}.${ext}`
+      const { error: upErr } = await supabase.storage.from('project-files').upload(path, adminAttachment)
+      if (upErr) { toast.error('Failed to upload file'); return }
+      const { data: urlData } = supabase.storage.from('project-files').getPublicUrl(path)
+      file_url = urlData.publicUrl
+      file_name = adminAttachment.name
+      file_type = adminAttachment.type
+    }
     
     await supabase.from('messages').insert({
       client_id: selectedClientForMessages,
       sender: 'admin',
-      content: newAdminMessage.trim()
+      content: newAdminMessage.trim() || (file_name ? `Sent a file: ${file_name}` : ''),
+      file_url, file_name, file_type
     })
     setNewAdminMessage('')
+    setAdminAttachment(null)
     fetchData()
   }
 
@@ -315,43 +374,96 @@ export default function AdminDashboard() {
     }
   }
 
+  const toPlainEnglish = (msg: string): string => {
+    let text = msg
+      .replace(/^\[.*?\]\s*/, '')
+      .replace(/^[a-z]+(\(.*?\))?!?:\s*/i, '')
+      .replace(/\(#\d+\)/g, '')
+      .trim()
+    if (text.length < 4) return ''
+
+    // Remove technical jargon and rephrase
+    const replacements: [RegExp, string][] = [
+      [/\brefactor(ed|ing)?\b/gi, 'Improved'],
+      [/\bimpl(ement|emented|ementing)?\b/gi, 'Added'],
+      [/\bRLS\b/gi, 'security settings'],
+      [/\bCRUD\b/gi, 'data management'],
+      [/\bAPI\b/gi, 'backend'],
+      [/\bCSS\b/gi, 'styling'],
+      [/\bUI\b/gi, 'interface'],
+      [/\bUX\b/gi, 'user experience'],
+      [/\bSEO\b/gi, 'search engine visibility'],
+      [/\bCI\/CD\b/gi, 'deployment pipeline'],
+      [/\bdeps?\b/gi, 'dependencies'],
+      [/\bnpm\b/gi, 'package'],
+      [/\bcomponent(s)?\b/gi, 'section$1'],
+      [/\bendpoint(s)?\b/gi, 'feature$1'],
+      [/\bmigration(s)?\b/gi, 'database update$1'],
+      [/\bschema\b/gi, 'database structure'],
+      [/\bwebhook(s)?\b/gi, 'notification$1'],
+      [/\bmerge(d)?\s+(branch|pr|pull\s*request)\b/gi, 'Combined latest changes'],
+      [/\blint(ing|er)?\b/gi, 'code quality'],
+      [/\btsx?\b/gi, 'code'],
+      [/\benv\b/gi, 'configuration'],
+    ]
+    replacements.forEach(([pattern, replacement]) => {
+      text = text.replace(pattern, replacement)
+    })
+
+    return text.charAt(0).toUpperCase() + text.slice(1)
+  }
+
   const summarizeCommits = async (commits: any[]): Promise<string> => {
-    if (commits.length === 0) return 'No commits today'
-    const categories: Record<string, number> = {}
+    if (commits.length === 0) return 'No updates today — the team is planning the next steps.'
+
+    const buckets: Record<string, string[]> = {
+      'New features': [],
+      'Design & visual improvements': [],
+      'Bugs fixed': [],
+      'Performance improvements': [],
+      'General improvements': [],
+    }
+
     commits.forEach(c => {
-      const msg = c.commit.message.toLowerCase()
-      if (msg.includes('fix') || msg.includes('bug')) {
-        categories['Bug Fixes'] = (categories['Bug Fixes'] || 0) + 1
-      } else if (msg.includes('feature') || msg.includes('add') || msg.includes('new')) {
-        categories['New Features'] = (categories['New Features'] || 0) + 1
-      } else if (msg.includes('update') || msg.includes('refactor') || msg.includes('improve')) {
-        categories['Updates & Improvements'] = (categories['Updates & Improvements'] || 0) + 1
-      } else if (msg.includes('style') || msg.includes('css') || msg.includes('ui')) {
-        categories['UI/Styling'] = (categories['UI/Styling'] || 0) + 1
-      } else if (msg.includes('test')) {
-        categories['Tests'] = (categories['Tests'] || 0) + 1
-      } else if (msg.includes('doc') || msg.includes('readme')) {
-        categories['Documentation'] = (categories['Documentation'] || 0) + 1
+      const raw = c.commit.message.split('\n')[0]
+      const friendly = toPlainEnglish(raw)
+      if (!friendly) return
+      const lower = raw.toLowerCase()
+
+      if (lower.match(/fix|bug|issue|resolve|patch|crash|error/)) {
+        buckets['Bugs fixed'].push(friendly)
+      } else if (lower.match(/style|css|ui|design|layout|color|font|responsive|mobile|animation/)) {
+        buckets['Design & visual improvements'].push(friendly)
+      } else if (lower.match(/feat|add|new|create|implement|introduce|build/)) {
+        buckets['New features'].push(friendly)
+      } else if (lower.match(/perf|speed|optimi|cache|lazy|bundle|compress|fast/)) {
+        buckets['Performance improvements'].push(friendly)
       } else {
-        categories['Other Changes'] = (categories['Other Changes'] || 0) + 1
+        buckets['General improvements'].push(friendly)
       }
     })
-    const summaryLines: string[] = []
-    summaryLines.push(`${commits.length} commit${commits.length === 1 ? '' : 's'} today`)
-    Object.entries(categories).forEach(([cat, count]) => {
-      summaryLines.push(`• ${cat}: ${count}`)
-    })
-    const mainMessages = commits.slice(0, 3).map(c => c.commit.message.split('\n')[0])
-    if (mainMessages.length > 0) {
-      summaryLines.push('\nKey updates:')
-      mainMessages.forEach(msg => {
-        const cleanMsg = msg.replace(/^\[.*?\]\s*/, '').replace(/^[a-z]+:\s*/i, '')
-        if (cleanMsg.length > 5) {
-          summaryLines.push(`  - ${cleanMsg.charAt(0).toUpperCase() + cleanMsg.slice(1)}`)
-        }
-      })
+
+    const lines: string[] = []
+    const totalAreas = Object.values(buckets).filter(b => b.length > 0).length
+
+    if (commits.length === 1) {
+      lines.push('We made a focused update to your project today.')
+    } else if (commits.length <= 5) {
+      lines.push(`Good progress today — ${commits.length} updates across ${totalAreas} area${totalAreas === 1 ? '' : 's'} of your project.`)
+    } else {
+      lines.push(`Big day! ${commits.length} updates shipped across ${totalAreas} area${totalAreas === 1 ? '' : 's'} of your project.`)
     }
-    return summaryLines.join('\n')
+
+    Object.entries(buckets).forEach(([label, items]) => {
+      if (items.length === 0) return
+      lines.push('')
+      lines.push(`${label}:`)
+      items.forEach(item => {
+        lines.push(`  • ${item}`)
+      })
+    })
+
+    return lines.join('\n')
   }
 
   const generateDailySummary = async (project: Project) => {
@@ -387,6 +499,117 @@ export default function AdminDashboard() {
     setProjectSummaries(data || [])
   }
 
+  const fetchCredentials = async (projectId: string) => {
+    const { data } = await supabase
+      .from('client_credentials')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: false })
+    setCredentials(data || [])
+    setVisibleCreds(new Set())
+  }
+
+  const handleAddCredential = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedProjectForCreds) return
+    const form = e.target as HTMLFormElement
+    const formData = new FormData(form)
+    const { error } = await supabase.from('client_credentials').insert({
+      project_id: selectedProjectForCreds,
+      label: formData.get('label') as string,
+      credential_type: formData.get('credential_type') as string,
+      value: formData.get('value') as string,
+      username: (formData.get('username') as string) || null,
+      url: (formData.get('url') as string) || null,
+      notes: (formData.get('notes') as string) || null,
+    })
+    if (error) {
+      toast.error('Failed to save credential')
+    } else {
+      toast.success('Credential saved')
+      setShowAddCred(false)
+      form.reset()
+      fetchCredentials(selectedProjectForCreds)
+    }
+  }
+
+  const handleDeleteCredential = async (credId: string) => {
+    if (!confirm('Delete this credential? This cannot be undone.')) return
+    const { error } = await supabase.from('client_credentials').delete().eq('id', credId)
+    if (error) {
+      toast.error('Failed to delete credential')
+    } else {
+      toast.success('Credential deleted')
+      if (selectedProjectForCreds) fetchCredentials(selectedProjectForCreds)
+    }
+  }
+
+  const fetchMilestones = async (projectId: string) => {
+    const { data } = await supabase.from('project_milestones').select('*').eq('project_id', projectId).order('sort_order')
+    setMilestones(data || [])
+  }
+
+  const addMilestone = async (projectId: string, title: string) => {
+    if (!title.trim()) return
+    await supabase.from('project_milestones').insert({ project_id: projectId, title, sort_order: milestones.length })
+    fetchMilestones(projectId)
+  }
+
+  const toggleMilestone = async (id: string, projectId: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'completed' ? 'pending' : 'completed'
+    await supabase.from('project_milestones').update({ status: newStatus, completed_at: newStatus === 'completed' ? new Date().toISOString() : null }).eq('id', id)
+    fetchMilestones(projectId)
+  }
+
+  const deleteMilestone = async (id: string, projectId: string) => {
+    await supabase.from('project_milestones').delete().eq('id', id)
+    fetchMilestones(projectId)
+  }
+
+  const toggleCredVisibility = (credId: string) => {
+    setVisibleCreds(prev => {
+      const next = new Set(prev)
+      if (next.has(credId)) next.delete(credId)
+      else next.add(credId)
+      return next
+    })
+  }
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text)
+    toast.success('Copied to clipboard')
+  }
+
+  const fetchContacts = async () => {
+    setContactsLoading(true)
+    const { data } = await supabase.from('contact_submissions').select('*').order('created_at', { ascending: false })
+    setContactSubmissions(data || [])
+    setContactsLoading(false)
+  }
+
+  const fetchQuotes = async () => {
+    setQuotesLoading(true)
+    const { data } = await supabase.from('quotes').select('*').order('created_at', { ascending: false })
+    setQuoteRequests(data || [])
+    setQuotesLoading(false)
+  }
+
+  const updateContactStatus = async (id: string, status: string, admin_notes?: string) => {
+    const updates: any = { status }
+    if (admin_notes !== undefined) updates.admin_notes = admin_notes
+    const { error } = await supabase.from('contact_submissions').update(updates).eq('id', id)
+    if (error) toast.error('Failed to update')
+    else { toast.success('Updated'); fetchContacts() }
+  }
+
+  const updateQuoteStatus = async (id: string, status: string, admin_notes?: string) => {
+    const updates: any = { status }
+    if (admin_notes !== undefined) updates.admin_notes = admin_notes
+    const { error } = await supabase.from('quotes').update(updates).eq('id', id)
+    if (error) toast.error('Failed to update')
+    else { toast.success('Updated'); fetchQuotes() }
+  }
+
   const handleDownloadFile = async (file: ProjectFile) => {
     const { data } = await supabase.storage.from('project-files').download(file.file_path)
     if (data) {
@@ -415,14 +638,8 @@ export default function AdminDashboard() {
   }
 
   const handleDeleteClient = async (id: string, name: string) => {
-    if (!confirm(`Delete client "${name}"?\n\nThis will also delete all their projects, invoices, and messages. This cannot be undone.`)) return
+    if (!confirm(`Delete client "${name}"?\n\nThis will also delete all their projects, invoices, messages, and credentials. This cannot be undone.`)) return
     
-    // Delete related data first (due to foreign key constraints)
-    await supabase.from('messages').delete().eq('client_id', id)
-    await supabase.from('invoices').delete().eq('client_id', id)
-    await supabase.from('projects').delete().eq('client_id', id)
-    
-    // Delete the client profile
     const { error } = await supabase.from('profiles').delete().eq('id', id)
     
     if (error) {
@@ -652,6 +869,11 @@ export default function AdminDashboard() {
       toast.error('Invoice created but failed to add line items')
     } else {
       toast.success('Invoice created successfully')
+      // Send invoice notification email to client
+      const client = clients.find((c: Client) => c.id === clientId)
+      if (client) {
+        sendEmail(client.email, `New Invoice #${invoiceNumber} - Sites That Slap`, invoiceNotificationEmail(client.name, invoiceNumber, totalAmount))
+      }
     }
     
     setShowInvoiceModal(false)
@@ -711,8 +933,8 @@ export default function AdminDashboard() {
     const formData = new FormData(form)
     
     const email = formData.get('email') as string
-    const password = formData.get('password') as string
     const name = formData.get('name') as string
+    const password = Array.from(crypto.getRandomValues(new Uint8Array(12))).map(b => 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%'[b % 60]).join('')
     const phone = formData.get('phone') as string
     const address = formData.get('address') as string
     const company_name = formData.get('company_name') as string
@@ -801,7 +1023,7 @@ export default function AdminDashboard() {
         if (!updateError) {
           profileUpdated = true
         } else {
-          console.log(`Profile update attempt ${retries + 1} failed, retrying...`, updateError)
+          // Profile not ready yet, trigger may still be running
           retries++
         }
       }
@@ -810,13 +1032,14 @@ export default function AdminDashboard() {
         console.error('Failed to update profile after all retries')
       }
 
+      // Send welcome email (fire and forget)
+      sendEmail(email, `Welcome to Sites That Slap, ${name}!`, clientWelcomeEmail(name, email, password))
+
       // Show success message
       if (authData.session) {
-        // User can login immediately (email confirmation disabled)
-        alert(`Client "${name}" created successfully!\n\nThey can now login with:\nEmail: ${email}\nPassword: ${password}`)
+        toast.success(`Client "${name}" created! Welcome email sent.`)
       } else {
-        // Email confirmation required
-        alert(`Client "${name}" created successfully!\n\nIMPORTANT: An email confirmation has been sent to ${email}. The client must click the link in the email before they can login.\n\nEmail: ${email}\nPassword: ${password}`)
+        toast.success(`Client "${name}" created! Welcome email sent. They'll need to confirm their email first.`)
       }
 
       setShowClientModal(false)
@@ -1092,7 +1315,7 @@ export default function AdminDashboard() {
                   { label: 'Overdue', value: `£${stats.overdueAmount.toLocaleString()}`, icon: XCircle, color: 'from-red-500 to-pink-500' },
                   { label: 'Total Clients', value: stats.totalClients.toString(), icon: Users, color: 'from-blue-500 to-cyan-500' },
                   { label: 'Active Projects', value: stats.activeProjects.toString(), icon: CheckCircle, color: 'from-purple-500 to-pink-500' },
-                  { label: 'Avg Project Value', value: '£4,200', icon: TrendingUp, color: 'from-cyan-500 to-blue-500' },
+                  { label: 'Avg Project Value', value: `£${invoices.length > 0 ? Math.round(invoices.reduce((s: number, i: Invoice) => s + i.amount, 0) / Math.max(projects.length, 1)).toLocaleString() : '0'}`, icon: TrendingUp, color: 'from-cyan-500 to-blue-500' },
                 ].map((stat, i) => (
                   <motion.div
                     key={i}
@@ -1189,6 +1412,58 @@ export default function AdminDashboard() {
                       />
                       <Bar dataKey="count" radius={[4, 4, 0, 0]} />
                     </BarChart>
+                  </ResponsiveContainer>
+                </motion.div>
+              </div>
+
+              {/* Revenue Over Time + Client Growth */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="glass-neon rounded-2xl p-6">
+                  <h2 className="text-lg font-bold text-white mb-4">Revenue Over Time</h2>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <AreaChart data={(() => {
+                      const months: Record<string, number> = {}
+                      invoices.filter((i: Invoice) => i.status === 'paid').forEach((inv: Invoice) => {
+                        const key = new Date(inv.date).toLocaleDateString('en-GB', { month: 'short', year: '2-digit' })
+                        months[key] = (months[key] || 0) + inv.amount
+                      })
+                      return Object.entries(months).slice(-6).map(([month, revenue]) => ({ month, revenue }))
+                    })()}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                      <XAxis dataKey="month" stroke="#94A3B8" fontSize={12} />
+                      <YAxis stroke="#94A3B8" fontSize={12} tickFormatter={(v) => `£${v}`} />
+                      <Tooltip contentStyle={{ backgroundColor: '#1a1a2e', border: 'none', borderRadius: '8px', color: '#fff' }} formatter={(v: any) => [`£${Number(v).toLocaleString()}`, 'Revenue']} />
+                      <defs>
+                        <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10B981" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <Area type="monotone" dataKey="revenue" stroke="#10B981" strokeWidth={2} fill="url(#revenueGrad)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </motion.div>
+
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} className="glass-neon rounded-2xl p-6">
+                  <h2 className="text-lg font-bold text-white mb-4">Client Growth</h2>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <LineChart data={(() => {
+                      const months: Record<string, number> = {}
+                      const sorted = [...clients].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+                      let total = 0
+                      sorted.forEach((c: Client) => {
+                        const key = new Date(c.created_at).toLocaleDateString('en-GB', { month: 'short', year: '2-digit' })
+                        total++
+                        months[key] = total
+                      })
+                      return Object.entries(months).slice(-6).map(([month, clients]) => ({ month, clients }))
+                    })()}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                      <XAxis dataKey="month" stroke="#94A3B8" fontSize={12} />
+                      <YAxis stroke="#94A3B8" fontSize={12} />
+                      <Tooltip contentStyle={{ backgroundColor: '#1a1a2e', border: 'none', borderRadius: '8px', color: '#fff' }} />
+                      <Line type="monotone" dataKey="clients" stroke="#8338EC" strokeWidth={2} dot={{ fill: '#8338EC', r: 4 }} />
+                    </LineChart>
                   </ResponsiveContainer>
                 </motion.div>
               </div>
@@ -1375,6 +1650,41 @@ export default function AdminDashboard() {
                         </div>
                         <div className="flex items-center gap-1">
                           <button 
+                            onClick={async () => {
+                              if (!confirm(`Reset password for "${client.name}"?\n\nA new password will be generated and emailed to ${client.email}.`)) return
+                              const newPass = Array.from(crypto.getRandomValues(new Uint8Array(12))).map(b => 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%'[b % 60]).join('')
+                              const { error } = await supabase.functions.invoke('reset-password', { body: { userId: client.id, newPassword: newPass } })
+                              if (error) {
+                                toast.error('Failed to reset password: ' + error.message)
+                              } else {
+                                sendEmail(client.email, 'Your password has been reset - Sites That Slap', `
+                                  <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+                                    <div style="text-align: center; margin-bottom: 30px;">
+                                      <h1 style="color: #FF006E; font-size: 28px; margin: 0;">Sites That Slap</h1>
+                                    </div>
+                                    <div style="background: #f9f9f9; border-radius: 12px; padding: 30px; border-left: 4px solid #FF006E;">
+                                      <h2 style="color: #1a1a1a; margin-top: 0;">Hi ${client.name},</h2>
+                                      <p style="color: #444; line-height: 1.6;">Your password has been reset. Here are your new login details:</p>
+                                      <div style="background: white; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                                        <p style="color: #444; margin: 5px 0;"><strong>Email:</strong> ${client.email}</p>
+                                        <p style="color: #444; margin: 5px 0;"><strong>New Password:</strong> ${newPass}</p>
+                                      </div>
+                                      <p style="color: #999; font-size: 12px;">We recommend changing your password after logging in.</p>
+                                      <div style="text-align: center; margin-top: 20px;">
+                                        <a href="https://www.sitesthatslap.com/login" style="display: inline-block; background: linear-gradient(135deg, #FF006E, #8338EC); color: white; text-decoration: none; padding: 12px 30px; border-radius: 8px; font-weight: bold;">Log In</a>
+                                      </div>
+                                    </div>
+                                  </div>
+                                `)
+                                toast.success(`Password reset! New password emailed to ${client.email}`)
+                              }
+                            }}
+                            className="p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-yellow-400"
+                            title="Reset password"
+                          >
+                            <KeyRound className="w-4 h-4" />
+                          </button>
+                          <button 
                             onClick={() => setEditingClient(client)}
                             className="p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white"
                             title="Edit client"
@@ -1471,7 +1781,14 @@ export default function AdminDashboard() {
                             {project.status.replace('_', ' ')}
                           </span>
                           <button
-                            onClick={() => setEditingProject(project)}
+                            onClick={() => { setSelectedProjectForCreds(project.id); fetchCredentials(project.id) }}
+                            className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-yellow-400 transition-colors"
+                            title="API keys & credentials"
+                          >
+                            <KeyRound className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => { setEditingProject(project); fetchMilestones(project.id) }}
                             className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
                             title="Edit project"
                           >
@@ -1745,7 +2062,12 @@ export default function AdminDashboard() {
                         return (
                           <button
                             key={client.id}
-                            onClick={() => setSelectedClientForMessages(client.id)}
+                            onClick={async () => {
+                              setSelectedClientForMessages(client.id)
+                              await supabase.from('messages').update({ read: true }).eq('client_id', client.id).eq('sender', 'client').eq('read', false)
+                              await supabase.from('notifications').delete().eq('user_id', user!.id).ilike('message', `%${client.name}%`).eq('type', 'info')
+                              fetchData()
+                            }}
                             className={`w-full p-3 rounded-xl text-left transition-all ${
                               selectedClientForMessages === client.id
                                 ? 'bg-gradient-to-r from-pink-500/20 to-purple-500/20 border border-pink-500/30'
@@ -1809,7 +2131,20 @@ export default function AdminDashboard() {
                                     ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-br-md' 
                                     : 'bg-white/10 text-white rounded-bl-md'
                                 }`}>
-                                  <p>{message.content}</p>
+                                  {message.file_url && (
+                                    message.file_type?.startsWith('image/') ? (
+                                      <a href={message.file_url} target="_blank" rel="noopener noreferrer">
+                                        <img src={message.file_url} alt={message.file_name} className="max-w-[300px] rounded-lg mb-2 hover:opacity-80 transition-opacity" />
+                                      </a>
+                                    ) : (
+                                      <a href={message.file_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-2 rounded-lg bg-black/20 mb-2 hover:bg-black/30 transition-colors">
+                                        <FileIcon className="w-4 h-4 shrink-0" />
+                                        <span className="text-sm truncate">{message.file_name}</span>
+                                        <Download className="w-3.5 h-3.5 shrink-0 ml-auto" />
+                                      </a>
+                                    )
+                                  )}
+                                  {message.content && !message.content.startsWith('Sent a file:') && <p>{message.content}</p>}
                                   <p className={`text-xs mt-1 ${message.sender === 'admin' ? 'text-white/70' : 'text-slate-400'}`}>
                                     {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                   </p>
@@ -1826,22 +2161,35 @@ export default function AdminDashboard() {
                         </div>
 
                         {/* Input */}
-                        <form onSubmit={handleSendAdminMessage} className="flex gap-2 pt-4 border-t border-white/10">
-                          <input
-                            type="text"
-                            value={newAdminMessage}
-                            onChange={(e) => setNewAdminMessage(e.target.value)}
-                            placeholder="Type a message..."
-                            className="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-pink-500/50"
-                          />
-                          <button
-                            type="submit"
-                            disabled={!newAdminMessage.trim()}
-                            className="px-4 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold disabled:opacity-50"
-                          >
-                            <Send className="w-5 h-5" />
-                          </button>
-                        </form>
+                        <div className="pt-4 border-t border-white/10">
+                          {adminAttachment && (
+                            <div className="flex items-center gap-2 mb-2 p-2 rounded-lg bg-white/5">
+                              <Paperclip className="w-4 h-4 text-pink-400" />
+                              <span className="text-sm text-slate-300 truncate flex-1">{adminAttachment.name}</span>
+                              <button onClick={() => setAdminAttachment(null)} className="text-slate-400 hover:text-red-400"><X className="w-4 h-4" /></button>
+                            </div>
+                          )}
+                          <form onSubmit={handleSendAdminMessage} className="flex gap-2">
+                            <label className="px-3 py-3 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 cursor-pointer transition-colors">
+                              <Paperclip className="w-5 h-5" />
+                              <input type="file" className="hidden" onChange={(e) => { if (e.target.files?.[0]) setAdminAttachment(e.target.files[0]) }} />
+                            </label>
+                            <input
+                              type="text"
+                              value={newAdminMessage}
+                              onChange={(e) => setNewAdminMessage(e.target.value)}
+                              placeholder="Type a message..."
+                              className="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-pink-500/50"
+                            />
+                            <button
+                              type="submit"
+                              disabled={!newAdminMessage.trim() && !adminAttachment}
+                              className="px-4 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold disabled:opacity-50"
+                            >
+                              <Send className="w-5 h-5" />
+                            </button>
+                          </form>
+                        </div>
                       </>
                     ) : (
                       <div className="flex-1 flex items-center justify-center">
@@ -1988,7 +2336,10 @@ export default function AdminDashboard() {
           {activeTab === 'kanban' && (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
-                <h1 className="text-3xl font-black text-white">Kanban Board</h1>
+                <div>
+                  <h1 className="text-3xl font-black text-white">Kanban Board</h1>
+                  <p className="text-slate-400 text-sm mt-1">Drag and drop projects to update their status</p>
+                </div>
                 <button 
                   onClick={() => setShowProjectModal(true)}
                   className="px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-bold flex items-center gap-2"
@@ -1999,158 +2350,277 @@ export default function AdminDashboard() {
 
               {/* Kanban Columns */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {/* In Progress */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 pb-2 border-b-2 border-blue-500">
-                    <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                    <h2 className="font-bold text-white">In Progress</h2>
-                    <span className="ml-auto text-sm text-slate-400">
-                      {filteredProjects.filter(p => p.status === 'in_progress').length}
-                    </span>
-                  </div>
-                  <div className="space-y-3">
-                    {filteredProjects
-                      .filter(p => p.status === 'in_progress')
-                      .map(project => (
-                        <motion.div
-                          key={project.id}
-                          layoutId={project.id}
-                          className="glass-neon rounded-xl p-4 cursor-pointer hover:bg-white/5 transition-colors"
-                          onClick={() => setEditingProject(project)}
-                        >
-                          <h3 className="font-semibold text-white mb-1">{project.name}</h3>
-                          <p className="text-sm text-slate-400 mb-3">{project.client?.name || 'Unknown'}</p>
-                          <div className="flex items-center justify-between">
-                            <div className="w-20 h-2 rounded-full bg-white/10 overflow-hidden">
-                              <div 
-                                className="h-full bg-blue-500 rounded-full"
-                                style={{ width: `${project.progress}%` }}
-                              />
+                {([
+                  { status: 'in_progress' as const, label: 'In Progress', color: 'blue' },
+                  { status: 'review' as const, label: 'Review', color: 'purple' },
+                  { status: 'completed' as const, label: 'Completed', color: 'green' },
+                  { status: 'on_hold' as const, label: 'On Hold', color: 'yellow' },
+                ]).map(column => {
+                  const columnProjects = filteredProjects.filter(p => p.status === column.status)
+                  const colorMap: Record<string, string> = { blue: 'border-blue-500', purple: 'border-purple-500', green: 'border-green-500', yellow: 'border-yellow-500' }
+                  const bgColorMap: Record<string, string> = { blue: 'bg-blue-500', purple: 'bg-purple-500', green: 'bg-green-500', yellow: 'bg-yellow-500' }
+                  const barColorMap: Record<string, string> = { blue: 'bg-blue-500', purple: 'bg-purple-500', green: 'bg-green-500', yellow: 'bg-yellow-500' }
+                  return (
+                    <div
+                      key={column.status}
+                      className="space-y-4"
+                      onDragOver={(e) => {
+                        e.preventDefault()
+                        e.currentTarget.classList.add('ring-2', 'ring-white/20', 'rounded-2xl')
+                      }}
+                      onDragLeave={(e) => {
+                        e.currentTarget.classList.remove('ring-2', 'ring-white/20', 'rounded-2xl')
+                      }}
+                      onDrop={async (e) => {
+                        e.preventDefault()
+                        e.currentTarget.classList.remove('ring-2', 'ring-white/20', 'rounded-2xl')
+                        const projectId = e.dataTransfer.getData('text/plain')
+                        const project = projects.find(p => p.id === projectId)
+                        if (!project || project.status === column.status) return
+                        const progressMap: Record<string, number> = { in_progress: Math.max(project.progress, 10), review: Math.max(project.progress, 75), completed: 100, on_hold: project.progress }
+                        const { error } = await supabase.from('projects').update({ status: column.status, progress: progressMap[column.status] }).eq('id', projectId)
+                        if (error) {
+                          toast.error('Failed to update project')
+                        } else {
+                          toast.success(`"${project.name}" moved to ${column.label}`)
+                          fetchData()
+                        }
+                      }}
+                    >
+                      <div className={`flex items-center gap-2 pb-2 border-b-2 ${colorMap[column.color]}`}>
+                        <div className={`w-3 h-3 rounded-full ${bgColorMap[column.color]}`}></div>
+                        <h2 className="font-bold text-white">{column.label}</h2>
+                        <span className="ml-auto text-sm text-slate-400">{columnProjects.length}</span>
+                      </div>
+                      <div className="space-y-3 min-h-[100px]">
+                        {columnProjects.map(project => (
+                          <motion.div
+                            key={project.id}
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            draggable
+                            onDragStart={(e: any) => {
+                              e.dataTransfer.setData('text/plain', project.id)
+                              e.currentTarget.style.opacity = '0.5'
+                            }}
+                            onDragEnd={(e: any) => {
+                              e.currentTarget.style.opacity = '1'
+                            }}
+                            className="glass-neon rounded-xl p-4 cursor-grab active:cursor-grabbing hover:bg-white/5 transition-colors select-none"
+                            onClick={() => { setEditingProject(project); fetchMilestones(project.id) }}
+                          >
+                            <h3 className="font-semibold text-white mb-1">{project.name}</h3>
+                            <p className="text-sm text-slate-400 mb-3">{project.client?.name || 'Unknown'}</p>
+                            <div className="flex items-center justify-between">
+                              <div className="w-20 h-2 rounded-full bg-white/10 overflow-hidden">
+                                <div 
+                                  className={`h-full rounded-full ${barColorMap[column.color]}`}
+                                  style={{ width: `${project.progress}%` }}
+                                />
+                              </div>
+                              <span className="text-xs text-slate-400">{project.progress}%</span>
                             </div>
-                            <span className="text-xs text-slate-400">{project.progress}%</span>
+                            <p className="text-xs text-slate-500 mt-2">
+                              Due: {new Date(project.deadline).toLocaleDateString()}
+                            </p>
+                          </motion.div>
+                        ))}
+                        {columnProjects.length === 0 && (
+                          <div className="border-2 border-dashed border-white/10 rounded-xl p-6 text-center">
+                            <p className="text-slate-500 text-sm">Drop here</p>
                           </div>
-                          <p className="text-xs text-slate-500 mt-2">
-                            Due: {new Date(project.deadline).toLocaleDateString()}
-                          </p>
-                        </motion.div>
-                      ))}
-                  </div>
-                </div>
-
-                {/* Review */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 pb-2 border-b-2 border-purple-500">
-                    <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-                    <h2 className="font-bold text-white">Review</h2>
-                    <span className="ml-auto text-sm text-slate-400">
-                      {filteredProjects.filter(p => p.status === 'review').length}
-                    </span>
-                  </div>
-                  <div className="space-y-3">
-                    {filteredProjects
-                      .filter(p => p.status === 'review')
-                      .map(project => (
-                        <motion.div
-                          key={project.id}
-                          layoutId={project.id}
-                          className="glass-neon rounded-xl p-4 cursor-pointer hover:bg-white/5 transition-colors"
-                          onClick={() => setEditingProject(project)}
-                        >
-                          <h3 className="font-semibold text-white mb-1">{project.name}</h3>
-                          <p className="text-sm text-slate-400 mb-3">{project.client?.name || 'Unknown'}</p>
-                          <div className="flex items-center justify-between">
-                            <div className="w-20 h-2 rounded-full bg-white/10 overflow-hidden">
-                              <div 
-                                className="h-full bg-purple-500 rounded-full"
-                                style={{ width: `${project.progress}%` }}
-                              />
-                            </div>
-                            <span className="text-xs text-slate-400">{project.progress}%</span>
-                          </div>
-                          <p className="text-xs text-slate-500 mt-2">
-                            Due: {new Date(project.deadline).toLocaleDateString()}
-                          </p>
-                        </motion.div>
-                      ))}
-                  </div>
-                </div>
-
-                {/* Completed */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 pb-2 border-b-2 border-green-500">
-                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                    <h2 className="font-bold text-white">Completed</h2>
-                    <span className="ml-auto text-sm text-slate-400">
-                      {filteredProjects.filter(p => p.status === 'completed').length}
-                    </span>
-                  </div>
-                  <div className="space-y-3">
-                    {filteredProjects
-                      .filter(p => p.status === 'completed')
-                      .map(project => (
-                        <motion.div
-                          key={project.id}
-                          layoutId={project.id}
-                          className="glass-neon rounded-xl p-4 cursor-pointer hover:bg-white/5 transition-colors"
-                          onClick={() => setEditingProject(project)}
-                        >
-                          <h3 className="font-semibold text-white mb-1">{project.name}</h3>
-                          <p className="text-sm text-slate-400 mb-3">{project.client?.name || 'Unknown'}</p>
-                          <div className="flex items-center justify-between">
-                            <div className="w-20 h-2 rounded-full bg-white/10 overflow-hidden">
-                              <div 
-                                className="h-full bg-green-500 rounded-full"
-                                style={{ width: `${project.progress}%` }}
-                              />
-                            </div>
-                            <span className="text-xs text-slate-400">{project.progress}%</span>
-                          </div>
-                          <p className="text-xs text-slate-500 mt-2">
-                            Due: {new Date(project.deadline).toLocaleDateString()}
-                          </p>
-                        </motion.div>
-                      ))}
-                  </div>
-                </div>
-
-                {/* On Hold */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 pb-2 border-b-2 border-yellow-500">
-                    <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                    <h2 className="font-bold text-white">On Hold</h2>
-                    <span className="ml-auto text-sm text-slate-400">
-                      {filteredProjects.filter(p => p.status === 'on_hold').length}
-                    </span>
-                  </div>
-                  <div className="space-y-3">
-                    {filteredProjects
-                      .filter(p => p.status === 'on_hold')
-                      .map(project => (
-                        <motion.div
-                          key={project.id}
-                          layoutId={project.id}
-                          className="glass-neon rounded-xl p-4 cursor-pointer hover:bg-white/5 transition-colors"
-                          onClick={() => setEditingProject(project)}
-                        >
-                          <h3 className="font-semibold text-white mb-1">{project.name}</h3>
-                          <p className="text-sm text-slate-400 mb-3">{project.client?.name || 'Unknown'}</p>
-                          <div className="flex items-center justify-between">
-                            <div className="w-20 h-2 rounded-full bg-white/10 overflow-hidden">
-                              <div 
-                                className="h-full bg-yellow-500 rounded-full"
-                                style={{ width: `${project.progress}%` }}
-                              />
-                            </div>
-                            <span className="text-xs text-slate-400">{project.progress}%</span>
-                          </div>
-                          <p className="text-xs text-slate-500 mt-2">
-                            Due: {new Date(project.deadline).toLocaleDateString()}
-                          </p>
-                        </motion.div>
-                      ))}
-                  </div>
-                </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
+            </div>
+          )}
+
+          {activeTab === 'contacts' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h1 className="text-3xl font-black text-white">Contact Submissions</h1>
+              </div>
+              {contactsLoading ? (
+                <div className="text-center py-8"><Loader2 className="w-8 h-8 text-pink-500 animate-spin mx-auto" /></div>
+              ) : contactSubmissions.length === 0 ? (
+                <p className="text-slate-400 text-center py-8">No contact submissions yet</p>
+              ) : (
+                <div className="space-y-4">
+                  {contactSubmissions.map((c: any) => (
+                    <motion.div key={c.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-neon rounded-2xl p-6">
+                      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h3 className="font-bold text-white text-lg">{c.name}</h3>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                              c.status === 'new' ? 'bg-pink-500/20 text-pink-400' :
+                              c.status === 'read' ? 'bg-blue-500/20 text-blue-400' :
+                              c.status === 'replied' ? 'bg-green-500/20 text-green-400' :
+                              'bg-slate-500/20 text-slate-400'
+                            }`}>{c.status}</span>
+                          </div>
+                          <p className="text-sm text-slate-400 mb-1">{c.email}</p>
+                          <p className="text-white mt-3 whitespace-pre-wrap">{c.message}</p>
+                          {c.admin_notes && (
+                            <div className="mt-3 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+                              <p className="text-xs text-yellow-400 font-bold mb-1">Admin Notes</p>
+                              <p className="text-sm text-slate-300">{c.admin_notes}</p>
+                            </div>
+                          )}
+                          <p className="text-xs text-slate-500 mt-3">{new Date(c.created_at).toLocaleString()}</p>
+                        </div>
+                        <div className="flex flex-wrap gap-2 shrink-0">
+                          <select
+                            value={c.status}
+                            onChange={(e) => updateContactStatus(c.id, e.target.value)}
+                            className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm"
+                          >
+                            <option value="new">New</option>
+                            <option value="read">Read</option>
+                            <option value="replied">Replied</option>
+                            <option value="archived">Archived</option>
+                          </select>
+                          <button
+                            onClick={() => {
+                              const note = prompt('Add admin note:', c.admin_notes || '')
+                              if (note !== null) updateContactStatus(c.id, c.status, note)
+                            }}
+                            className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:text-white text-sm"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <a
+                            href={`mailto:${c.email}?subject=Re: Your enquiry to Sites That Slap&body=Hi ${c.name},%0A%0AThank you for reaching out.%0A%0A`}
+                            className="px-3 py-2 rounded-lg bg-gradient-to-r from-pink-500 to-purple-500 text-white text-sm font-bold flex items-center gap-1"
+                            onClick={() => { if (c.status === 'new' || c.status === 'read') updateContactStatus(c.id, 'replied') }}
+                          >
+                            <Send className="w-3.5 h-3.5" /> Reply
+                          </a>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'quotes' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h1 className="text-3xl font-black text-white">Quote Requests</h1>
+              </div>
+              {quotesLoading ? (
+                <div className="text-center py-8"><Loader2 className="w-8 h-8 text-pink-500 animate-spin mx-auto" /></div>
+              ) : quoteRequests.length === 0 ? (
+                <p className="text-slate-400 text-center py-8">No quote requests yet</p>
+              ) : (
+                <div className="space-y-4">
+                  {quoteRequests.map((q: any) => (
+                    <motion.div key={q.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-neon rounded-2xl p-6">
+                      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-2 flex-wrap">
+                            <h3 className="font-bold text-white text-lg">{q.name}</h3>
+                            {q.company && <span className="text-sm text-pink-400">{q.company}</span>}
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                              q.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
+                              q.status === 'reviewing' ? 'bg-blue-500/20 text-blue-400' :
+                              q.status === 'quoted' ? 'bg-purple-500/20 text-purple-400' :
+                              q.status === 'accepted' ? 'bg-green-500/20 text-green-400' :
+                              'bg-red-500/20 text-red-400'
+                            }`}>{q.status}</span>
+                          </div>
+                          <p className="text-sm text-slate-400">{q.email}{q.phone ? ` · ${q.phone}` : ''}</p>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
+                            {q.services?.length > 0 && (
+                              <div>
+                                <p className="text-xs text-slate-500 font-bold mb-1">Services</p>
+                                <div className="flex flex-wrap gap-1">
+                                  {q.services.map((s: string) => (
+                                    <span key={s} className="px-2 py-0.5 rounded-full bg-pink-500/10 text-pink-400 text-xs">{s}</span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {q.timeline && (
+                              <div>
+                                <p className="text-xs text-slate-500 font-bold mb-1">Timeline</p>
+                                <p className="text-sm text-white">{q.timeline}</p>
+                              </div>
+                            )}
+                            {q.budget && (
+                              <div>
+                                <p className="text-xs text-slate-500 font-bold mb-1">Budget</p>
+                                <p className="text-sm text-white">{q.budget}</p>
+                              </div>
+                            )}
+                          </div>
+
+                          {q.features?.length > 0 && (
+                            <div className="mt-3">
+                              <p className="text-xs text-slate-500 font-bold mb-1">Features</p>
+                              <div className="flex flex-wrap gap-1">
+                                {q.features.map((f: string) => (
+                                  <span key={f} className="px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 text-xs">{f}</span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {q.project_details && (
+                            <div className="mt-3">
+                              <p className="text-xs text-slate-500 font-bold mb-1">Project Details</p>
+                              <p className="text-sm text-slate-300 whitespace-pre-wrap">{q.project_details}</p>
+                            </div>
+                          )}
+
+                          {q.admin_notes && (
+                            <div className="mt-3 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+                              <p className="text-xs text-yellow-400 font-bold mb-1">Admin Notes</p>
+                              <p className="text-sm text-slate-300">{q.admin_notes}</p>
+                            </div>
+                          )}
+
+                          <p className="text-xs text-slate-500 mt-3">{new Date(q.created_at).toLocaleString()}</p>
+                        </div>
+                        <div className="flex flex-wrap gap-2 shrink-0">
+                          <select
+                            value={q.status}
+                            onChange={(e) => updateQuoteStatus(q.id, e.target.value)}
+                            className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm"
+                          >
+                            <option value="pending">Pending</option>
+                            <option value="reviewing">Reviewing</option>
+                            <option value="quoted">Quoted</option>
+                            <option value="accepted">Accepted</option>
+                            <option value="declined">Declined</option>
+                          </select>
+                          <button
+                            onClick={() => {
+                              const note = prompt('Add admin note:', q.admin_notes || '')
+                              if (note !== null) updateQuoteStatus(q.id, q.status, note)
+                            }}
+                            className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:text-white text-sm"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <a
+                            href={`mailto:${q.email}?subject=Your Quote Request - Sites That Slap&body=Hi ${q.name},%0A%0AThank you for your quote request.%0A%0A`}
+                            className="px-3 py-2 rounded-lg bg-gradient-to-r from-pink-500 to-purple-500 text-white text-sm font-bold flex items-center gap-1"
+                          >
+                            <Send className="w-3.5 h-3.5" /> Reply
+                          </a>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -2418,7 +2888,7 @@ export default function AdminDashboard() {
             >
               <h2 className="text-2xl font-black text-white mb-2">Create Client</h2>
               <p className="text-xs text-slate-400 mb-4">
-                Client will receive an account with login credentials. 
+                A secure password will be auto-generated and emailed to the client.
                 <span className="text-slap-pink">*</span> Required fields
               </p>
               <form onSubmit={handleCreateClient} className="space-y-4">
@@ -2433,10 +2903,6 @@ export default function AdminDashboard() {
                     <div>
                       <label className="block text-slate-400 text-sm mb-2">Email *</label>
                       <input name="email" type="email" required className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" placeholder="client@example.com" />
-                    </div>
-                    <div>
-                      <label className="block text-slate-400 text-sm mb-2">Password *</label>
-                      <input name="password" type="password" required minLength={6} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white" placeholder="Min 6 characters" />
                     </div>
                   </div>
                 </div>
@@ -2615,6 +3081,28 @@ export default function AdminDashboard() {
                   </button>
                 </div>
               </form>
+
+              {/* Milestones */}
+              <div className="mt-6 pt-6 border-t border-white/10">
+                <h3 className="font-bold text-white mb-3 flex items-center gap-2"><Target className="w-4 h-4 text-cyan-400" /> Milestones</h3>
+                <div className="space-y-2 mb-3">
+                  {milestones.map((m: any) => (
+                    <div key={m.id} className="flex items-center gap-2 group">
+                      <button onClick={() => toggleMilestone(m.id, editingProject!.id, m.status)} className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors ${m.status === 'completed' ? 'bg-green-500 border-green-500' : 'border-white/20 hover:border-pink-500'}`}>
+                        {m.status === 'completed' && <CheckCircle className="w-3.5 h-3.5 text-white" />}
+                      </button>
+                      <span className={`flex-1 text-sm ${m.status === 'completed' ? 'text-slate-500 line-through' : 'text-white'}`}>{m.title}</span>
+                      <button onClick={() => deleteMilestone(m.id, editingProject!.id)} className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-all">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <form onSubmit={(e) => { e.preventDefault(); const input = (e.target as HTMLFormElement).querySelector('input') as HTMLInputElement; addMilestone(editingProject!.id, input.value); input.value = '' }} className="flex gap-2">
+                  <input type="text" placeholder="Add milestone..." className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm placeholder-slate-500" />
+                  <button type="submit" className="px-3 py-2 rounded-lg bg-cyan-500/20 text-cyan-400 text-sm font-bold hover:bg-cyan-500/30"><Plus className="w-4 h-4" /></button>
+                </form>
+              </div>
             </motion.div>
           </motion.div>
         )}
@@ -2674,6 +3162,141 @@ export default function AdminDashboard() {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </motion.div>
+        )}
+        {/* Credentials Modal */}
+        {selectedProjectForCreds && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+            onClick={() => { setSelectedProjectForCreds(null); setShowAddCred(false) }}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="glass-neon rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-yellow-500 to-orange-500 flex items-center justify-center">
+                    <KeyRound className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black text-white">Credentials & API Keys</h2>
+                    <p className="text-sm text-slate-400">{projects.find((p: Project) => p.id === selectedProjectForCreds)?.name}</p>
+                  </div>
+                </div>
+                <button onClick={() => { setSelectedProjectForCreds(null); setShowAddCred(false) }} className="p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Existing Credentials */}
+              <div className="space-y-3 mb-6">
+                {credentials.length === 0 && !showAddCred && (
+                  <p className="text-slate-500 text-center py-8">No credentials stored yet</p>
+                )}
+                {credentials.map((cred) => (
+                  <div key={cred.id} className="p-4 rounded-xl bg-white/5 border border-white/10">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-yellow-500/20 text-yellow-400">
+                          {credentialTypeLabels[cred.credential_type] || cred.credential_type}
+                        </span>
+                        <span className="font-bold text-white text-sm">{cred.label}</span>
+                      </div>
+                      <button onClick={() => handleDeleteCredential(cred.id)} className="p-1.5 rounded-lg hover:bg-white/10 text-slate-500 hover:text-red-400">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {cred.username && (
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs text-slate-500 w-16">Username</span>
+                        <span className="text-sm text-slate-300 font-mono">{cred.username}</span>
+                        <button onClick={() => copyToClipboard(cred.username!)} className="p-1 rounded hover:bg-white/10 text-slate-500 hover:text-white"><Copy className="w-3 h-3" /></button>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs text-slate-500 w-16">Value</span>
+                      <span className="text-sm text-slate-300 font-mono flex-1 break-all">
+                        {visibleCreds.has(cred.id) ? cred.value : '•'.repeat(Math.min(cred.value.length, 32))}
+                      </span>
+                      <button onClick={() => toggleCredVisibility(cred.id)} className="p-1 rounded hover:bg-white/10 text-slate-500 hover:text-white">
+                        {visibleCreds.has(cred.id) ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                      </button>
+                      <button onClick={() => copyToClipboard(cred.value)} className="p-1 rounded hover:bg-white/10 text-slate-500 hover:text-white"><Copy className="w-3 h-3" /></button>
+                    </div>
+
+                    {cred.url && (
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs text-slate-500 w-16">URL</span>
+                        <a href={cred.url} target="_blank" rel="noopener noreferrer" className="text-sm text-cyan-400 hover:underline truncate">{cred.url}</a>
+                      </div>
+                    )}
+
+                    {cred.notes && (
+                      <p className="text-xs text-slate-500 italic mt-2">{cred.notes}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Add New Credential Form */}
+              {showAddCred ? (
+                <form onSubmit={handleAddCredential} className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-3">
+                  <h3 className="font-bold text-white text-sm mb-3">Add Credential</h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-400 text-xs mb-1">Label *</label>
+                      <input name="label" type="text" required placeholder="e.g. Stripe Live Key" className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm" />
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 text-xs mb-1">Type</label>
+                      <select name="credential_type" className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm">
+                        {Object.entries(credentialTypeLabels).map(([val, label]) => (
+                          <option key={val} value={val}>{label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 text-xs mb-1">Value / Key / Password *</label>
+                    <input name="value" type="text" required placeholder="sk_live_..." className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm font-mono" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-400 text-xs mb-1">Username</label>
+                      <input name="username" type="text" placeholder="admin@..." className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm" />
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 text-xs mb-1">URL</label>
+                      <input name="url" type="url" placeholder="https://..." className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 text-xs mb-1">Notes</label>
+                    <input name="notes" type="text" placeholder="Optional notes..." className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm" />
+                  </div>
+                  <div className="flex gap-3 pt-2">
+                    <button type="button" onClick={() => setShowAddCred(false)} className="flex-1 px-3 py-2 rounded-lg bg-white/5 text-white text-sm font-bold hover:bg-white/10">Cancel</button>
+                    <button type="submit" className="flex-1 px-3 py-2 rounded-lg bg-gradient-to-r from-yellow-500 to-orange-500 text-white text-sm font-bold">Save</button>
+                  </div>
+                </form>
+              ) : (
+                <button
+                  onClick={() => setShowAddCred(true)}
+                  className="w-full p-3 rounded-xl border border-dashed border-white/20 text-slate-400 hover:text-white hover:border-white/40 transition-colors flex items-center justify-center gap-2 text-sm"
+                >
+                  <Plus className="w-4 h-4" /> Add Credential
+                </button>
+              )}
             </motion.div>
           </motion.div>
         )}

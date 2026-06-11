@@ -2,14 +2,15 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Link, useNavigate } from 'react-router-dom'
 import { 
-  ArrowLeft, CheckCircle, Globe, ShoppingCart, Smartphone, Zap, Palette, Rocket,
+  ArrowLeft, CheckCircle, Globe, ShoppingCart, Palette,
   Ticket, Calendar, UtensilsCrossed, Home, GraduationCap, CalendarDays, Monitor,
-  ChevronRight, Send, Loader2, Sparkles, Clock, Wallet, Building2, FileText,
-  Users, CreditCard, Bell, Lock, Search, BarChart3, Share2, Video, Mail,
-  PenTool, Layers, Megaphone, Target, Briefcase, MessageSquare, Server, Shield,
-  Star, CheckSquare, Package, Paintbrush, Code, Smartphone as MobileIcon, Globe2
+  ChevronRight, Send, Loader2, FileText,
+  Users, CreditCard, BarChart3, Share2,
+  PenTool, Layers, Megaphone, Briefcase, MessageSquare, Server, Shield,
+  Paintbrush, Code
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { sendEmail, quoteConfirmationEmail } from '../lib/email'
 import { toast } from 'sonner'
 
 const stepLabels = [
@@ -55,7 +56,6 @@ const serviceCategories = [
   }
 ]
 
-const allServices = serviceCategories.flatMap(cat => cat.services)
 
 const featureGroups = [
   {
@@ -120,7 +120,6 @@ const featureGroups = [
   }
 ]
 
-const allFeatures = featureGroups.flatMap(g => g.features)
 
 const timelines = [
   { value: 'asap', label: 'ASAP', desc: 'Rush delivery' },
@@ -207,6 +206,8 @@ export default function QuoteBuilder() {
       toast.error('Failed to submit. Please try again.')
     } else {
       toast.success('Quote submitted! We\'ll be in touch within 24 hours.')
+      // Send confirmation email (fire and forget)
+      sendEmail(email, 'Your quote request - Sites That Slap', quoteConfirmationEmail(name))
       navigate('/')
     }
     setSubmitting(false)
