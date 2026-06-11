@@ -8,7 +8,8 @@ import { toast } from 'sonner'
 import { 
   FileText, CreditCard, MessageSquare, CheckCircle2, 
   Clock, Download, LogOut, User, Loader2, Send, Settings,
-  Github, CalendarDays, ChevronDown, ChevronUp, Paperclip, X, FileIcon, Target
+  Github, CalendarDays, ChevronDown, ChevronUp, Paperclip, X, FileIcon, Target,
+  FolderOpen, AlertTriangle, HelpCircle, ExternalLink
 } from 'lucide-react'
 import { NotificationBell } from '../components/Notifications'
 import SettingsModal from '../components/SettingsModal'
@@ -55,7 +56,7 @@ interface Message {
 
 export default function ClientDashboard() {
   const { user, logout } = useAuth()
-  const [activeTab, setActiveTab] = useState<'projects' | 'invoices' | 'messages'>('projects')
+  const [activeTab, setActiveTab] = useState<'projects' | 'invoices' | 'messages' | 'files' | 'support'>('projects')
   const [showSettings, setShowSettings] = useState(false)
   const [projects, setProjects] = useState<Project[]>([])
   const [invoices, setInvoices] = useState<Invoice[]>([])
@@ -67,6 +68,10 @@ export default function ClientDashboard() {
   const [summaries, setSummaries] = useState<Record<string, ProjectSummary[]>>({})
   const [expandedProject, setExpandedProject] = useState<string | null>(null)
   const [projectMilestones, setProjectMilestones] = useState<Record<string, any[]>>({})
+  const [projectFiles, setProjectFiles] = useState<any[]>([])
+  const [supportSubject, setSupportSubject] = useState('')
+  const [supportMessage, setSupportMessage] = useState('')
+  const [sendingSupport, setSendingSupport] = useState(false)
 
   useEffect(() => {
     if (user) {
@@ -107,10 +112,12 @@ export default function ClientDashboard() {
     // Fetch summaries and milestones for all projects
     const projectIds = (projectsData || []).map((p: Project) => p.id).filter(Boolean)
     if (projectIds.length > 0) {
-      const [{ data: summaryData }, { data: milestoneData }] = await Promise.all([
+      const [{ data: summaryData }, { data: milestoneData }, { data: filesData }] = await Promise.all([
         supabase.from('project_summaries').select('*').in('project_id', projectIds).order('date', { ascending: false }).limit(100),
-        supabase.from('project_milestones').select('*').in('project_id', projectIds).order('sort_order')
+        supabase.from('project_milestones').select('*').in('project_id', projectIds).order('sort_order'),
+        supabase.from('project_files').select('*').in('project_id', projectIds).order('created_at', { ascending: false })
       ])
+      setProjectFiles(filesData || [])
       
       if (summaryData) {
         const grouped: Record<string, ProjectSummary[]> = {}
@@ -319,9 +326,33 @@ export default function ClientDashboard() {
     doc.save(`${invoice.invoice_number}.pdf`)
   }
 
+  const handleSupportRequest = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!supportSubject.trim() || !supportMessage.trim() || !user) return
+    setSendingSupport(true)
+    
+    await supabase.from('messages').insert({
+      client_id: user.id,
+      sender: 'client',
+      content: `🎫 Support Request: ${supportSubject}\n\n${supportMessage}`
+    })
+    toast.success('Support request sent! We\'ll get back to you shortly.')
+    setSupportSubject('')
+    setSupportMessage('')
+    setSendingSupport(false)
+    fetchData()
+  }
+
   const handleLogout = () => {
     logout()
     window.location.href = '/login'
+  }
+
+  const unreadCount = messages.filter((m: Message) => m.sender === 'admin' && !m.read).length
+
+  const getDaysUntilDeadline = (deadline: string) => {
+    const diff = Math.ceil((new Date(deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    return diff
   }
 
   return (
@@ -400,24 +431,34 @@ export default function ClientDashboard() {
 
         {/* Tabs - Mobile Scrollable */}
         <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0">
-          {(['projects', 'invoices', 'messages'] as const).map((tab) => (
+          {([
+            { key: 'projects' as const, label: 'Projects', icon: CheckCircle2 },
+            { key: 'invoices' as const, label: 'Invoices', icon: FileText },
+            { key: 'messages' as const, label: 'Messages', icon: MessageSquare },
+            { key: 'files' as const, label: 'Files', icon: FolderOpen },
+            { key: 'support' as const, label: 'Support', icon: HelpCircle },
+          ]).map((tab) => (
             <button
-              key={tab}
+              key={tab.key}
               onClick={async () => {
-                setActiveTab(tab)
-                if (tab === 'messages' && user) {
+                setActiveTab(tab.key)
+                if (tab.key === 'messages' && user) {
                   await supabase.from('messages').update({ read: true }).eq('client_id', user.id).eq('sender', 'admin').eq('read', false)
                   await supabase.from('notifications').delete().eq('user_id', user.id).ilike('title', '%message%')
                   fetchData()
                 }
               }}
-              className={`px-6 py-3 rounded-xl font-semibold capitalize transition-all ${
-                activeTab === tab 
+              className={`px-5 py-3 rounded-xl font-semibold transition-all flex items-center gap-2 whitespace-nowrap ${
+                activeTab === tab.key 
                   ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white' 
                   : 'text-slate-400 hover:text-white hover:bg-white/5'
               }`}
             >
-              {tab}
+              <tab.icon className="w-4 h-4" />
+              {tab.label}
+              {tab.key === 'messages' && unreadCount > 0 && (
+                <span className="ml-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center font-bold">{unreadCount}</span>
+              )}
             </button>
           ))}
         </div>
@@ -480,7 +521,13 @@ export default function ClientDashboard() {
                         </div>
                         <div className="flex items-center justify-between text-sm text-slate-400">
                           <span>{project.progress}% Complete</span>
-                          <span>Due: {project.deadline}</span>
+                          {(() => {
+                            const days = getDaysUntilDeadline(project.deadline)
+                            if (project.status === 'completed') return <span className="text-green-400">✓ Completed</span>
+                            if (days < 0) return <span className="text-red-400 flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" /> {Math.abs(days)} days overdue</span>
+                            if (days <= 7) return <span className="text-yellow-400 flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {days} day{days !== 1 ? 's' : ''} left</span>
+                            return <span>Due: {new Date(project.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                          })()}
                         </div>
 
                         {/* Milestones */}
@@ -553,40 +600,56 @@ export default function ClientDashboard() {
                     key={invoice.id}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    className="p-4 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between"
+                    className={`p-4 rounded-xl border flex items-center justify-between ${
+                      invoice.status === 'overdue' ? 'bg-red-500/5 border-red-500/30' : 'bg-white/5 border-white/10'
+                    }`}
                   >
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center">
-                        <FileText className="w-6 h-6 text-pink-500" />
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                        invoice.status === 'overdue' ? 'bg-red-500/10' : 'bg-white/5'
+                      }`}>
+                        {invoice.status === 'overdue' ? (
+                          <AlertTriangle className="w-6 h-6 text-red-400" />
+                        ) : (
+                          <FileText className="w-6 h-6 text-pink-500" />
+                        )}
                       </div>
                       <div>
                         <p className="font-bold text-white">{invoice.invoice_number}</p>
-                        <p className="text-sm text-slate-400">{invoice.date}</p>
+                        <p className="text-sm text-slate-400">{new Date(invoice.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                        {invoice.status !== 'paid' && (
+                          <p className={`text-xs mt-0.5 ${invoice.status === 'overdue' ? 'text-red-400' : 'text-slate-500'}`}>
+                            Due: {new Date(invoice.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </p>
+                        )}
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-xl font-black text-white">£{invoice.amount.toLocaleString()}</p>
-                      <div className="flex items-center gap-2 mt-1">
+                    <div className="text-right flex items-center gap-3">
+                      <div>
+                        <p className="text-xl font-black text-white">£{invoice.amount.toLocaleString()}</p>
                         <span className={`text-xs px-2 py-1 rounded-full ${
-                          invoice.status === 'paid' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'
+                          invoice.status === 'paid' ? 'bg-green-500/20 text-green-400' : 
+                          invoice.status === 'overdue' ? 'bg-red-500/20 text-red-400' :
+                          'bg-yellow-500/20 text-yellow-400'
                         }`}>
                           {invoice.status}
                         </span>
-                        {invoice.status === 'paid' ? (
-                          <button 
-                            onClick={() => handleDownloadInvoice(invoice)}
-                            className="text-slate-400 hover:text-white"
-                            title="Download invoice"
-                          >
-                            <Download className="w-4 h-4" />
-                          </button>
-                        ) : (
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <button 
+                          onClick={() => handleDownloadInvoice(invoice)}
+                          className="p-2 rounded-lg bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                          title="Download PDF"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
+                        {invoice.status !== 'paid' && (
                           <button 
                             onClick={() => handlePayInvoice(invoice.id)}
                             disabled={payingInvoice === invoice.id}
-                            className="px-3 py-1 rounded-lg bg-gradient-to-r from-pink-500 to-purple-500 text-white text-xs font-bold disabled:opacity-50"
+                            className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-pink-500 to-purple-500 text-white text-xs font-bold disabled:opacity-50"
                           >
-                            {payingInvoice === invoice.id ? 'Processing...' : 'Pay Now'}
+                            {payingInvoice === invoice.id ? '...' : 'Pay'}
                           </button>
                         )}
                       </div>
@@ -681,6 +744,121 @@ export default function ClientDashboard() {
                     <Send className="w-5 h-5" />
                   </button>
                 </form>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'files' && (
+            <div className="space-y-4">
+              <h2 className="text-xl font-bold text-white mb-4">Project Files</h2>
+              {loading ? (
+                <div className="text-center py-8">
+                  <Loader2 className="w-8 h-8 text-pink-500 animate-spin mx-auto" />
+                </div>
+              ) : projectFiles.length === 0 ? (
+                <div className="text-center py-12">
+                  <FolderOpen className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                  <p className="text-slate-400">No files shared yet</p>
+                  <p className="text-slate-500 text-sm mt-2">Files uploaded by the team will appear here</p>
+                </div>
+              ) : (
+                projects.map((project: Project) => {
+                  const files = projectFiles.filter((f: any) => f.project_id === project.id)
+                  if (files.length === 0) return null
+                  return (
+                    <div key={project.id}>
+                      <h3 className="text-sm font-bold text-slate-400 mb-2 uppercase tracking-wider">{project.name}</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {files.map((file: any) => {
+                          const { data: urlData } = supabase.storage.from('project-files').getPublicUrl(file.file_path)
+                          const isImage = file.file_name?.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i)
+                          return (
+                            <a
+                              key={file.id}
+                              href={urlData.publicUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors group"
+                            >
+                              <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
+                                {isImage ? (
+                                  <img src={urlData.publicUrl} alt="" className="w-10 h-10 rounded-lg object-cover" />
+                                ) : (
+                                  <FileIcon className="w-5 h-5 text-pink-400" />
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold text-white truncate">{file.file_name}</p>
+                                <p className="text-xs text-slate-500">{new Date(file.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
+                              </div>
+                              <ExternalLink className="w-4 h-4 text-slate-500 group-hover:text-white shrink-0" />
+                            </a>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          )}
+
+          {activeTab === 'support' && (
+            <div className="space-y-6">
+              <h2 className="text-xl font-bold text-white mb-2">Support Request</h2>
+              <p className="text-slate-400 text-sm">Need help? Submit a request and we'll respond within 24 hours.</p>
+              
+              <form onSubmit={handleSupportRequest} className="space-y-4 max-w-lg">
+                <div>
+                  <label className="text-sm font-semibold text-slate-300 block mb-1.5">Subject</label>
+                  <input
+                    type="text"
+                    value={supportSubject}
+                    onChange={(e) => setSupportSubject(e.target.value)}
+                    placeholder="e.g. Change to homepage design"
+                    className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-pink-500/50"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold text-slate-300 block mb-1.5">Message</label>
+                  <textarea
+                    value={supportMessage}
+                    onChange={(e) => setSupportMessage(e.target.value)}
+                    placeholder="Describe what you need..."
+                    rows={5}
+                    className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-pink-500/50 resize-none"
+                    required
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={sendingSupport || !supportSubject.trim() || !supportMessage.trim()}
+                  className="px-6 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold disabled:opacity-50 flex items-center gap-2"
+                >
+                  {sendingSupport ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  {sendingSupport ? 'Sending...' : 'Send Request'}
+                </button>
+              </form>
+
+              <div className="border-t border-white/10 pt-6 mt-6">
+                <h3 className="font-bold text-white mb-3">Other ways to reach us</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <a href="mailto:hello@sitesthatslap.com" className="flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors">
+                    <div className="w-10 h-10 rounded-lg bg-pink-500/20 flex items-center justify-center"><MessageSquare className="w-5 h-5 text-pink-400" /></div>
+                    <div>
+                      <p className="text-sm font-semibold text-white">Email Us</p>
+                      <p className="text-xs text-slate-400">hello@sitesthatslap.com</p>
+                    </div>
+                  </a>
+                  <button onClick={() => setActiveTab('messages')} className="flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors text-left">
+                    <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center"><Send className="w-5 h-5 text-purple-400" /></div>
+                    <div>
+                      <p className="text-sm font-semibold text-white">Live Chat</p>
+                      <p className="text-xs text-slate-400">Send us a direct message</p>
+                    </div>
+                  </button>
+                </div>
               </div>
             </div>
           )}
