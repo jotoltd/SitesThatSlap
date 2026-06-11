@@ -13,7 +13,7 @@ import {
   CheckCircle, XCircle, Clock, Send, Trash2, Edit2,
   Search, Filter, Download, Menu, X, Loader2, MessageSquare, Upload,
   CalendarDays, LayoutGrid, Github, Settings, Activity,
-  KeyRound, Eye, EyeOff, Copy, Paperclip, FileIcon, Target
+  KeyRound, Eye, EyeOff, Copy, Paperclip, FileIcon, Target, RefreshCw, Pause, Play
 } from 'lucide-react'
 import { NotificationBell } from '../components/Notifications'
 import SettingsModal from '../components/SettingsModal'
@@ -137,7 +137,7 @@ const credentialTypeLabels: Record<string, string> = {
 export default function AdminDashboard() {
   const { user, logout, setSuppressAuthChange } = useAuth()
   const { logActivity } = useActivityLog()
-  const [activeTab, setActiveTab] = useState<'overview' | 'clients' | 'invoices' | 'projects' | 'messages' | 'calendar' | 'kanban' | 'activity' | 'quotes' | 'contacts'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'clients' | 'invoices' | 'projects' | 'messages' | 'calendar' | 'kanban' | 'activity' | 'quotes' | 'contacts' | 'recurring'>('overview')
   const [showSettings, setShowSettings] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -178,6 +178,10 @@ export default function AdminDashboard() {
   const [quoteRequests, setQuoteRequests] = useState<any[]>([])
   const [contactsLoading, setContactsLoading] = useState(false)
   const [quotesLoading, setQuotesLoading] = useState(false)
+  const [recurringPlans, setRecurringPlans] = useState<any[]>([])
+  const [recurringLoading, setRecurringLoading] = useState(false)
+  const [showRecurringModal, setShowRecurringModal] = useState(false)
+  const [editingRecurring, setEditingRecurring] = useState<any | null>(null)
   const [showBroadcastModal, setShowBroadcastModal] = useState(false)
   const [broadcastSubject, setBroadcastSubject] = useState('')
   const [broadcastMessage, setBroadcastMessage] = useState('')
@@ -215,7 +219,68 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (activeTab === 'contacts') fetchContacts()
     if (activeTab === 'quotes') fetchQuotes()
+    if (activeTab === 'recurring') fetchRecurringPlans()
   }, [activeTab])
+
+  const fetchRecurringPlans = async () => {
+    setRecurringLoading(true)
+    const { data } = await supabase
+      .from('recurring_plans')
+      .select('*, project:projects(name), client:profiles(name, email)')
+      .order('created_at', { ascending: false })
+    setRecurringPlans(data || [])
+    setRecurringLoading(false)
+  }
+
+  const handleSaveRecurring = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const form = e.target as HTMLFormElement
+    const fd = new FormData(form)
+    const startDate = fd.get('start_date') as string
+    const payload = {
+      project_id: fd.get('project_id') as string,
+      client_id: projects.find(p => p.id === (fd.get('project_id') as string))?.client_id || '',
+      description: fd.get('description') as string,
+      amount: Number(fd.get('amount')),
+      interval: fd.get('interval') as string,
+      start_date: startDate,
+      next_invoice_date: startDate,
+      end_date: (fd.get('end_date') as string) || null,
+      status: 'active',
+    }
+    if (!payload.client_id) { toast.error('Project has no client assigned'); return }
+    if (editingRecurring) {
+      await supabase.from('recurring_plans').update(payload).eq('id', editingRecurring.id)
+      toast.success('Recurring plan updated')
+    } else {
+      await supabase.from('recurring_plans').insert(payload)
+      toast.success('Recurring plan created')
+    }
+    setShowRecurringModal(false)
+    setEditingRecurring(null)
+    form.reset()
+    fetchRecurringPlans()
+  }
+
+  const handleToggleRecurring = async (plan: any) => {
+    const newStatus = plan.status === 'active' ? 'paused' : 'active'
+    await supabase.from('recurring_plans').update({ status: newStatus }).eq('id', plan.id)
+    toast.success(`Plan ${newStatus}`)
+    fetchRecurringPlans()
+  }
+
+  const handleCancelRecurring = async (id: string) => {
+    if (!confirm('Cancel this recurring plan? This cannot be undone.')) return
+    await supabase.from('recurring_plans').update({ status: 'cancelled' }).eq('id', id)
+    toast.success('Recurring plan cancelled')
+    fetchRecurringPlans()
+  }
+
+  const handleRunRecurringNow = async () => {
+    const { error } = await supabase.functions.invoke('generate-recurring-invoices')
+    if (error) toast.error('Failed to run: ' + error.message)
+    else { toast.success('Recurring invoices generated'); fetchRecurringPlans() }
+  }
 
   const fetchData = async () => {
     setLoading(true)
@@ -1482,6 +1547,7 @@ export default function AdminDashboard() {
               { id: 'kanban', label: 'Kanban', icon: LayoutGrid },
               { id: 'messages', label: 'Messages', icon: MessageSquare, badge: unreadCount },
               { id: 'calendar', label: 'Calendar', icon: CalendarDays },
+              { id: 'recurring', label: 'Recurring', icon: RefreshCw, badge: recurringPlans.filter(p => p.status === 'active').length },
               { id: 'activity', label: 'Activity Log', icon: Activity },
             ].map((item) => (
               <button
@@ -2877,8 +2943,185 @@ export default function AdminDashboard() {
               </div>
             </div>
           )}
+
+          {activeTab === 'recurring' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div>
+                  <h1 className="text-3xl font-black text-white">Recurring Payments</h1>
+                  <p className="text-slate-400 mt-1">Auto-generate invoices on a schedule</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleRunRecurringNow}
+                    className="px-4 py-3 rounded-xl glass-neon text-slate-400 font-bold flex items-center gap-2 hover:text-white"
+                    title="Manually trigger invoice generation now"
+                  >
+                    <RefreshCw className="w-4 h-4" /> Run Now
+                  </button>
+                  <button
+                    onClick={() => { setEditingRecurring(null); setShowRecurringModal(true) }}
+                    className="px-6 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold flex items-center gap-2"
+                  >
+                    <Plus className="w-5 h-5" /> New Plan
+                  </button>
+                </div>
+              </div>
+
+              {recurringLoading ? (
+                <div className="text-center py-12"><Loader2 className="w-8 h-8 text-pink-500 animate-spin mx-auto" /></div>
+              ) : recurringPlans.length === 0 ? (
+                <div className="glass-neon rounded-2xl p-12 text-center">
+                  <RefreshCw className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                  <p className="text-slate-400 text-lg font-semibold">No recurring plans yet</p>
+                  <p className="text-slate-500 text-sm mt-2">Set up automated invoice generation for retainer clients</p>
+                  <button onClick={() => { setEditingRecurring(null); setShowRecurringModal(true) }} className="mt-6 px-6 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold">
+                    Create First Plan
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {recurringPlans.map((plan: any) => (
+                    <motion.div key={plan.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-neon rounded-2xl p-5">
+                      <div className="flex items-start justify-between gap-4 flex-wrap">
+                        <div className="flex items-center gap-4">
+                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                            plan.status === 'active' ? 'bg-green-500/20' :
+                            plan.status === 'paused' ? 'bg-yellow-500/20' : 'bg-red-500/20'
+                          }`}>
+                            <RefreshCw className={`w-6 h-6 ${
+                              plan.status === 'active' ? 'text-green-400' :
+                              plan.status === 'paused' ? 'text-yellow-400' : 'text-red-400'
+                            }`} />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="font-bold text-white">{plan.description}</h3>
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                                plan.status === 'active' ? 'bg-green-500/20 text-green-400' :
+                                plan.status === 'paused' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'
+                              }`}>{plan.status}</span>
+                            </div>
+                            <p className="text-slate-400 text-sm mt-0.5">
+                              {plan.client?.name} · {plan.project?.name}
+                            </p>
+                            <div className="flex items-center gap-4 mt-1 text-xs text-slate-500 flex-wrap">
+                              <span className="capitalize">{plan.interval}</span>
+                              <span>Next: {new Date(plan.next_invoice_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                              {plan.end_date && <span>Ends: {new Date(plan.end_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>}
+                              <span>{plan.invoice_count} invoice{plan.invoice_count !== 1 ? 's' : ''} generated</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <p className="text-2xl font-black text-white">£{Number(plan.amount).toLocaleString()}</p>
+                            <p className="text-xs text-slate-500 capitalize">per {plan.interval.replace('ly', '')}</p>
+                          </div>
+                          <div className="flex gap-1">
+                            {plan.status !== 'cancelled' && (
+                              <button
+                                onClick={() => handleToggleRecurring(plan)}
+                                className={`p-2 rounded-lg hover:bg-white/10 transition-colors ${plan.status === 'active' ? 'text-yellow-400 hover:text-yellow-300' : 'text-green-400 hover:text-green-300'}`}
+                                title={plan.status === 'active' ? 'Pause' : 'Resume'}
+                              >
+                                {plan.status === 'active' ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                              </button>
+                            )}
+                            {plan.status !== 'cancelled' && (
+                              <button
+                                onClick={() => { setEditingRecurring(plan); setShowRecurringModal(true) }}
+                                className="p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white"
+                                title="Edit plan"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                            )}
+                            {plan.status !== 'cancelled' && (
+                              <button
+                                onClick={() => handleCancelRecurring(plan.id)}
+                                className="p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-red-400"
+                                title="Cancel plan"
+                              >
+                                <XCircle className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </main>
       </div>
+
+      {/* Recurring Plan Modal */}
+      <AnimatePresence>
+        {showRecurringModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+            onClick={() => { setShowRecurringModal(false); setEditingRecurring(null) }}>
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              className="glass-neon rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-xl font-black text-white">{editingRecurring ? 'Edit' : 'New'} Recurring Plan</h2>
+                <button onClick={() => { setShowRecurringModal(false); setEditingRecurring(null) }} className="p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+              </div>
+              <form onSubmit={handleSaveRecurring} className="space-y-4">
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Project</label>
+                  <select name="project_id" required defaultValue={editingRecurring?.project_id || ''} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-pink-500/50">
+                    <option value="">Select project...</option>
+                    {projects.filter(p => p.client_id).map((p: Project) => (
+                      <option key={p.id} value={p.id}>{p.name} — {p.client?.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Invoice Description</label>
+                  <input name="description" type="text" required defaultValue={editingRecurring?.description || ''} placeholder="e.g. Monthly retainer — website maintenance" className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-pink-500/50" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-slate-400 text-sm mb-2">Amount (£)</label>
+                    <input name="amount" type="number" required min="1" step="0.01" defaultValue={editingRecurring?.amount || ''} placeholder="0.00" className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-pink-500/50" />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 text-sm mb-2">Interval</label>
+                    <select name="interval" required defaultValue={editingRecurring?.interval || 'monthly'} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-pink-500/50">
+                      <option value="weekly">Weekly</option>
+                      <option value="monthly">Monthly</option>
+                      <option value="quarterly">Quarterly</option>
+                      <option value="annually">Annually</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-slate-400 text-sm mb-2">Start Date</label>
+                    <input name="start_date" type="date" required defaultValue={editingRecurring?.start_date || new Date().toISOString().split('T')[0]} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-pink-500/50" />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 text-sm mb-2">End Date <span className="text-slate-600">(optional)</span></label>
+                    <input name="end_date" type="date" defaultValue={editingRecurring?.end_date || ''} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-pink-500/50" />
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500">Invoices are auto-generated daily. Use <strong className="text-slate-400">Run Now</strong> to trigger manually.</p>
+                <div className="flex gap-3 pt-2">
+                  <button type="button" onClick={() => { setShowRecurringModal(false); setEditingRecurring(null) }} className="flex-1 px-4 py-3 rounded-xl bg-white/5 text-white font-bold hover:bg-white/10">Cancel</button>
+                  <button type="submit" className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold">
+                    {editingRecurring ? 'Save Changes' : 'Create Plan'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Broadcast Email Modal */}
       <AnimatePresence>
