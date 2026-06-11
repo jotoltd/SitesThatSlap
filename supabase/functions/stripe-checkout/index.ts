@@ -13,23 +13,18 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    )
-
-    const { data: modeSetting } = await supabaseClient
-      .from('app_settings')
-      .select('value')
-      .eq('key', 'stripe_mode')
-      .single()
-    const mode = modeSetting?.value || 'sandbox'
+    const mode = Deno.env.get('STRIPE_MODE') || 'sandbox'
     const secretKey = mode === 'live'
       ? Deno.env.get('STRIPE_SECRET_KEY_LIVE')!
       : Deno.env.get('STRIPE_SECRET_KEY_SANDBOX')!
     const stripe = new Stripe(secretKey, {
       apiVersion: '2023-10-16',
     })
+
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    )
 
     const { invoiceId } = await req.json()
 
@@ -58,7 +53,7 @@ serve(async (req) => {
 
     // Create Stripe Checkout Session
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card', 'bacs_debit'],
+      payment_method_types: ['card'],
       line_items: [
         {
           price_data: {
@@ -73,9 +68,6 @@ serve(async (req) => {
         },
       ],
       mode: 'payment',
-      payment_intent_data: {
-        setup_future_usage: 'off_session',
-      },
       success_url: `${siteUrl}/client?payment=success`,
       cancel_url: `${siteUrl}/client?payment=cancelled`,
       customer_email: invoice.client?.email,
