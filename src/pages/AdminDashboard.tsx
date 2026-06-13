@@ -67,6 +67,21 @@ interface Project {
   client?: Client
 }
 
+interface Lead {
+  id: string
+  name: string
+  email?: string
+  company?: string
+  status: 'new' | 'contacted' | 'qualified' | 'lost' | 'converted'
+  source?: string
+  notes?: string
+  client_id?: string
+  converted_to_project_id?: string
+  created_at: string
+  updated_at: string
+  client?: Client
+}
+
 interface ProjectSummary {
   id: string
   project_id: string
@@ -137,7 +152,7 @@ const credentialTypeLabels: Record<string, string> = {
 export default function AdminDashboard() {
   const { user, logout, setSuppressAuthChange } = useAuth()
   const { logActivity } = useActivityLog()
-  const [activeTab, setActiveTab] = useState<'overview' | 'clients' | 'invoices' | 'projects' | 'messages' | 'calendar' | 'kanban' | 'activity' | 'quotes' | 'contacts' | 'recurring'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'clients' | 'invoices' | 'projects' | 'messages' | 'calendar' | 'kanban' | 'activity' | 'quotes' | 'contacts' | 'recurring' | 'leads'>('overview')
   const [showSettings, setShowSettings] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -145,6 +160,10 @@ export default function AdminDashboard() {
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [messages, setMessages] = useState<Message[]>([])
   const [projects, setProjects] = useState<Project[]>([])
+  const [leads, setLeads] = useState<Lead[]>([])
+  const [leadsLoading, setLeadsLoading] = useState(false)
+  const [editingLead, setEditingLead] = useState<Lead | null>(null)
+  const [showLeadModal, setShowLeadModal] = useState(false)
   const [loading, setLoading] = useState(true)
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
   const [showProjectModal, setShowProjectModal] = useState(false)
@@ -222,6 +241,7 @@ export default function AdminDashboard() {
     if (activeTab === 'contacts') fetchContacts()
     if (activeTab === 'quotes') fetchQuotes()
     if (activeTab === 'recurring') fetchRecurringPlans()
+    if (activeTab === 'leads') fetchLeads()
   }, [activeTab])
 
   useEffect(() => { fetchStripeMode() }, [])
@@ -296,7 +316,65 @@ export default function AdminDashboard() {
   const handleRunRecurringNow = async () => {
     const { error } = await supabase.functions.invoke('generate-recurring-invoices')
     if (error) toast.error('Failed to run: ' + error.message)
-    else { toast.success('Recurring invoices generated'); fetchRecurringPlans() }
+    else toast.success('Recurring invoices generated')
+  }
+
+  const fetchLeads = async () => {
+    setLeadsLoading(true)
+    const { data } = await supabase
+      .from('leads')
+      .select('*, client:profiles(name, email)')
+      .order('created_at', { ascending: false })
+    setLeads(data || [])
+    setLeadsLoading(false)
+  }
+
+  const handleSaveLead = async (formData: FormData) => {
+    const payload = {
+      name: formData.get('name') as string,
+      email: formData.get('email') as string || null,
+      company: formData.get('company') as string || null,
+      status: formData.get('status') as string,
+      source: formData.get('source') as string || null,
+      notes: formData.get('notes') as string || null,
+      client_id: formData.get('client_id') as string || null,
+    }
+    if (editingLead) {
+      await supabase.from('leads').update(payload).eq('id', editingLead.id)
+      toast.success('Lead updated')
+    } else {
+      await supabase.from('leads').insert(payload)
+      toast.success('Lead created')
+    }
+    setShowLeadModal(false)
+    setEditingLead(null)
+    fetchLeads()
+  }
+
+  const handleDeleteLead = async (id: string) => {
+    if (!confirm('Delete this lead?')) return
+    await supabase.from('leads').delete().eq('id', id)
+    toast.success('Lead deleted')
+    fetchLeads()
+  }
+
+  const handleConvertToProject = async (lead: Lead) => {
+    if (!confirm('Convert this lead to a project?')) return
+    const { data: project } = await supabase.from('projects').insert({
+      client_id: lead.client_id || null,
+      name: lead.company || lead.name,
+      description: lead.notes || '',
+      status: 'in_progress',
+      progress: 0,
+      deadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    }).select().single()
+    if (project) {
+      await supabase.from('leads').update({ status: 'converted', converted_to_project_id: project.id }).eq('id', lead.id)
+      toast.success('Lead converted to project')
+      fetchLeads()
+      const { data: projectsData } = await supabase.from('projects').select('*, client:profiles(name, email)').order('created_at', { ascending: false })
+      setProjects(projectsData || [])
+    }
   }
 
   const fetchData = async () => {
@@ -1503,6 +1581,7 @@ export default function AdminDashboard() {
               {[
                 { id: 'overview', label: 'Overview', icon: TrendingUp },
                 { id: 'clients', label: 'Clients', icon: Users },
+                { id: 'leads', label: 'Leads', icon: Target },
                 { id: 'invoices', label: 'Invoices', icon: FileText },
                 { id: 'projects', label: 'Projects', icon: CheckCircle },
                 { id: 'kanban', label: 'Kanban', icon: LayoutGrid },
@@ -1557,6 +1636,7 @@ export default function AdminDashboard() {
             {[
               { id: 'overview', label: 'Overview', icon: TrendingUp },
               { id: 'clients', label: 'Clients', icon: Users },
+              { id: 'leads', label: 'Leads', icon: Target },
               { id: 'quotes', label: 'Quote Requests', icon: FileText },
               { id: 'contacts', label: 'Contact Forms', icon: MessageSquare },
               { id: 'invoices', label: 'Invoices', icon: FileText },
@@ -3121,6 +3201,102 @@ export default function AdminDashboard() {
               )}
             </div>
           )}
+
+          {activeTab === 'leads' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div>
+                  <h1 className="text-3xl font-black text-white">Leads</h1>
+                  <p className="text-slate-400 mt-1">Track and convert potential clients</p>
+                </div>
+                <button
+                  onClick={() => { setEditingLead(null); setShowLeadModal(true) }}
+                  className="px-6 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold flex items-center gap-2"
+                >
+                  <Plus className="w-5 h-5" /> Add Lead
+                </button>
+              </div>
+
+              {leadsLoading ? (
+                <div className="text-center py-12"><Loader2 className="w-8 h-8 text-pink-500 animate-spin mx-auto" /></div>
+              ) : leads.length === 0 ? (
+                <div className="glass-neon rounded-2xl p-12 text-center">
+                  <Target className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                  <p className="text-slate-400 text-lg font-semibold">No leads yet</p>
+                  <p className="text-slate-500 text-sm mt-2">Add potential clients to track and convert</p>
+                  <button onClick={() => { setEditingLead(null); setShowLeadModal(true) }} className="mt-6 px-6 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold">
+                    Add First Lead
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {leads.map((lead) => (
+                    <motion.div key={lead.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-neon rounded-2xl p-5">
+                      <div className="flex items-start justify-between gap-4 flex-wrap">
+                        <div className="flex items-center gap-4">
+                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                            lead.status === 'new' ? 'bg-blue-500/20' :
+                            lead.status === 'contacted' ? 'bg-yellow-500/20' :
+                            lead.status === 'qualified' ? 'bg-green-500/20' :
+                            lead.status === 'converted' ? 'bg-purple-500/20' : 'bg-red-500/20'
+                          }`}>
+                            <Target className={`w-6 h-6 ${
+                              lead.status === 'new' ? 'text-blue-400' :
+                              lead.status === 'contacted' ? 'text-yellow-400' :
+                              lead.status === 'qualified' ? 'text-green-400' :
+                              lead.status === 'converted' ? 'text-purple-400' : 'text-red-400'
+                            }`} />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="font-bold text-white">{lead.name}</h3>
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-bold capitalize ${
+                                lead.status === 'new' ? 'bg-blue-500/20 text-blue-400' :
+                                lead.status === 'contacted' ? 'bg-yellow-500/20 text-yellow-400' :
+                                lead.status === 'qualified' ? 'bg-green-500/20 text-green-400' :
+                                lead.status === 'converted' ? 'bg-purple-500/20 text-purple-400' : 'bg-red-500/20 text-red-400'
+                              }`}>{lead.status}</span>
+                            </div>
+                            {lead.company && <p className="text-slate-400 text-sm mt-0.5">{lead.company}</p>}
+                            {lead.email && <p className="text-slate-500 text-sm">{lead.email}</p>}
+                            {lead.source && <p className="text-xs text-slate-500 mt-1">Source: {lead.source}</p>}
+                            {lead.notes && <p className="text-slate-400 text-sm mt-2 line-clamp-2">{lead.notes}</p>}
+                            {lead.client && <p className="text-xs text-green-400 mt-1">Linked to: {lead.client.name}</p>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {lead.status !== 'converted' && (
+                            <button
+                              onClick={() => handleConvertToProject(lead)}
+                              className="px-3 py-2 rounded-lg bg-cyan-500/20 text-cyan-400 text-sm font-bold hover:bg-cyan-500/30 flex items-center gap-1"
+                              title="Convert to project"
+                            >
+                              <CheckCircle className="w-4 h-4" /> Convert
+                            </button>
+                          )}
+                          <button
+                            onClick={() => { setEditingLead(lead); setShowLeadModal(true) }}
+                            className="p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white"
+                            title="Edit lead"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteLead(lead.id)}
+                            className="p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-red-400"
+                            title="Delete lead"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
         </main>
       </div>
 
@@ -3181,6 +3357,71 @@ export default function AdminDashboard() {
                   <button type="button" onClick={() => { setShowRecurringModal(false); setEditingRecurring(null) }} className="flex-1 px-4 py-3 rounded-xl bg-white/5 text-white font-bold hover:bg-white/10">Cancel</button>
                   <button type="submit" className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold">
                     {editingRecurring ? 'Save Changes' : 'Create Plan'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Lead Modal */}
+      <AnimatePresence>
+        {showLeadModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+            onClick={() => { setShowLeadModal(false); setEditingLead(null) }}>
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              className="glass-neon rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-xl font-black text-white">{editingLead ? 'Edit' : 'Add'} Lead</h2>
+                <button onClick={() => { setShowLeadModal(false); setEditingLead(null) }} className="p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+              </div>
+              <form onSubmit={(e) => { e.preventDefault(); handleSaveLead(new FormData(e.target as HTMLFormElement)) }} className="space-y-4">
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Name *</label>
+                  <input name="name" type="text" required defaultValue={editingLead?.name || ''} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-pink-500/50" placeholder="John Smith" />
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Email</label>
+                  <input name="email" type="email" defaultValue={editingLead?.email || ''} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-pink-500/50" placeholder="john@example.com" />
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Company</label>
+                  <input name="company" type="text" defaultValue={editingLead?.company || ''} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-pink-500/50" placeholder="Company Ltd" />
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Status</label>
+                  <select name="status" defaultValue={editingLead?.status || 'new'} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-pink-500/50">
+                    <option value="new">New</option>
+                    <option value="contacted">Contacted</option>
+                    <option value="qualified">Qualified</option>
+                    <option value="lost">Lost</option>
+                    <option value="converted">Converted</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Source</label>
+                  <input name="source" type="text" defaultValue={editingLead?.source || ''} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-pink-500/50" placeholder="referral, website, linkedin, etc." />
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Link to Client</label>
+                  <select name="client_id" defaultValue={editingLead?.client_id || ''} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-pink-500/50">
+                    <option value="">No client linked</option>
+                    {clients.map((c: Client) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Notes</label>
+                  <textarea name="notes" rows={3} defaultValue={editingLead?.notes || ''} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white resize-none focus:outline-none focus:border-pink-500/50" placeholder="Any additional notes..." />
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button type="button" onClick={() => { setShowLeadModal(false); setEditingLead(null) }} className="flex-1 px-4 py-3 rounded-xl bg-white/5 text-white font-bold hover:bg-white/10">Cancel</button>
+                  <button type="submit" className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold">
+                    {editingLead ? 'Save Changes' : 'Add Lead'}
                   </button>
                 </div>
               </form>
