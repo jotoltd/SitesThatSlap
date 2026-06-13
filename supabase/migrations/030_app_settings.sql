@@ -10,5 +10,9 @@ CREATE POLICY "Admins can manage app settings"
   ON app_settings FOR ALL
   USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
 
+CREATE POLICY "Service role bypass RLS"
+  ON app_settings FOR ALL
+  USING (auth.role() = 'service_role');
+
 INSERT INTO app_settings (key, value) VALUES ('stripe_mode', 'sandbox')
   ON CONFLICT (key) DO NOTHING;

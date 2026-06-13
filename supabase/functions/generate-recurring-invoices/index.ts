@@ -40,11 +40,12 @@ function invoiceEmail(name: string, invoiceNumber: string, amount: number): stri
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  )
+
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    )
 
     const today = new Date()
     today.setHours(0, 0, 0, 0)
@@ -130,7 +131,21 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error) {
-    return new Response(JSON.stringify({ error: (error as Error).message }), {
+    const message = error instanceof Error ? error.message : String(error)
+    
+    // Log error to database
+    try {
+      await supabase.from('error_logs').insert({
+        function_name: 'generate-recurring-invoices',
+        error_message: message,
+        request_body: null,
+        metadata: {}
+      })
+    } catch (logErr) {
+      console.error('Failed to log error:', logErr)
+    }
+    
+    return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

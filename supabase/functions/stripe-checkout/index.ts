@@ -12,8 +12,21 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  const supabaseClient = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  )
+
+  let invoiceId: string | null = null
+  let mode = 'sandbox'
+
   try {
-    const mode = Deno.env.get('STRIPE_MODE') || 'sandbox'
+    const { data: modeSetting } = await supabaseClient
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'stripe_mode')
+      .single()
+    mode = modeSetting?.value || 'sandbox'
     const secretKey = mode === 'live'
       ? Deno.env.get('STRIPE_SECRET_KEY_LIVE')!
       : Deno.env.get('STRIPE_SECRET_KEY_SANDBOX')!
@@ -21,12 +34,8 @@ serve(async (req) => {
       apiVersion: '2023-10-16',
     })
 
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    )
-
-    const { invoiceId } = await req.json()
+    const body = await req.json()
+    invoiceId = body.invoiceId
 
     // Get invoice details
     const { data: invoice, error: invoiceError } = await supabaseClient
@@ -83,6 +92,19 @@ serve(async (req) => {
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
+    
+    // Log error to database
+    try {
+      await supabaseClient.from('error_logs').insert({
+        function_name: 'stripe-checkout',
+        error_message: message,
+        request_body: { invoiceId },
+        metadata: { mode }
+      })
+    } catch (logErr) {
+      console.error('Failed to log error:', logErr)
+    }
+    
     return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

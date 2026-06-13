@@ -1790,6 +1790,13 @@ export default function AdminDashboard() {
                     </button>
                   </div>
                 </div>
+                <div className="mt-3 flex items-center gap-2 text-xs">
+                  <span className="text-slate-400">Webhook:</span>
+                  <span className="text-green-400 bg-green-500/10 px-2 py-1 rounded-full">Connected</span>
+                  <a href="https://dashboard.stripe.com/test/webhooks" target="_blank" rel="noopener noreferrer" className="text-pink-400 hover:text-pink-300 underline">
+                    Manage →
+                  </a>
+                </div>
                 {stripeMode === 'live' && (
                   <p className="mt-3 text-xs text-red-400/80 bg-red-500/10 rounded-lg px-3 py-2">
                     ⚠️ Live mode active — real payments are being processed

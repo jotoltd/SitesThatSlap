@@ -8,7 +8,12 @@ serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   )
 
-  const mode = Deno.env.get('STRIPE_MODE') || 'sandbox'
+  const { data: modeSetting } = await supabaseClient
+    .from('app_settings')
+    .select('value')
+    .eq('key', 'stripe_mode')
+    .single()
+  const mode = modeSetting?.value || 'sandbox'
   const secretKey = mode === 'live'
     ? Deno.env.get('STRIPE_SECRET_KEY_LIVE')!
     : Deno.env.get('STRIPE_SECRET_KEY_SANDBOX')!
