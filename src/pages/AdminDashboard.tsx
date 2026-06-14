@@ -75,6 +75,7 @@ interface Lead {
   status: 'new' | 'contacted' | 'qualified' | 'lost' | 'converted'
   source?: string
   notes?: string
+  website?: string
   client_id?: string
   converted_to_project_id?: string
   created_at: string
@@ -337,6 +338,7 @@ export default function AdminDashboard() {
       status: formData.get('status') as string,
       source: formData.get('source') as string || null,
       notes: formData.get('notes') as string || null,
+      website: formData.get('website') as string || null,
       client_id: formData.get('client_id') as string || null,
     }
     if (editingLead) {
@@ -3259,6 +3261,7 @@ export default function AdminDashboard() {
                             </div>
                             {lead.company && <p className="text-slate-400 text-sm mt-0.5">{lead.company}</p>}
                             {lead.email && <p className="text-slate-500 text-sm">{lead.email}</p>}
+                            {lead.website && <a href={lead.website} target="_blank" rel="noopener noreferrer" className="text-xs text-pink-400 hover:text-pink-300 mt-1 underline">{lead.website}</a>}
                             {lead.source && <p className="text-xs text-slate-500 mt-1">Source: {lead.source}</p>}
                             {lead.notes && <p className="text-slate-400 text-sm mt-2 line-clamp-2">{lead.notes}</p>}
                             {lead.client && <p className="text-xs text-green-400 mt-1">Linked to: {lead.client.name}</p>}
@@ -3404,6 +3407,10 @@ export default function AdminDashboard() {
                 <div>
                   <label className="block text-slate-400 text-sm mb-2">Source</label>
                   <input name="source" type="text" defaultValue={editingLead?.source || ''} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-pink-500/50" placeholder="referral, website, linkedin, etc." />
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Website</label>
+                  <input name="website" type="url" defaultValue={editingLead?.website || ''} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-pink-500/50" placeholder="https://example.com" />
                 </div>
                 <div>
                   <label className="block text-slate-400 text-sm mb-2">Link to Client</label>
