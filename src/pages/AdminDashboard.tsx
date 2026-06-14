@@ -76,6 +76,9 @@ interface Lead {
   source?: string
   notes?: string
   website?: string
+  lead_type?: 'website_design' | 'website_redesign' | 'error_fixing' | 'maintenance' | 'consulting' | 'other'
+  contact_method?: 'they_contacted_me' | 'i_found_them'
+  how_found?: string
   client_id?: string
   converted_to_project_id?: string
   created_at: string
@@ -339,6 +342,9 @@ export default function AdminDashboard() {
       source: formData.get('source') as string || null,
       notes: formData.get('notes') as string || null,
       website: formData.get('website') as string || null,
+      lead_type: formData.get('lead_type') as string || null,
+      contact_method: formData.get('contact_method') as string || null,
+      how_found: formData.get('how_found') as string || null,
       client_id: formData.get('client_id') as string || null,
     }
     if (editingLead) {
@@ -3262,6 +3268,9 @@ export default function AdminDashboard() {
                             {lead.company && <p className="text-slate-400 text-sm mt-0.5">{lead.company}</p>}
                             {lead.email && <p className="text-slate-500 text-sm">{lead.email}</p>}
                             {lead.website && <a href={lead.website} target="_blank" rel="noopener noreferrer" className="text-xs text-pink-400 hover:text-pink-300 mt-1 underline">{lead.website}</a>}
+                            {lead.lead_type && <p className="text-xs text-cyan-400 mt-1 capitalize">{lead.lead_type.replace('_', ' ')}</p>}
+                            {lead.contact_method && <p className="text-xs text-purple-400 mt-1">{lead.contact_method === 'they_contacted_me' ? '📥 They contacted me' : '📤 I found them'}</p>}
+                            {lead.how_found && <p className="text-xs text-slate-500 mt-1">{lead.how_found}</p>}
                             {lead.source && <p className="text-xs text-slate-500 mt-1">Source: {lead.source}</p>}
                             {lead.notes && <p className="text-slate-400 text-sm mt-2 line-clamp-2">{lead.notes}</p>}
                             {lead.client && <p className="text-xs text-green-400 mt-1">Linked to: {lead.client.name}</p>}
@@ -3411,6 +3420,30 @@ export default function AdminDashboard() {
                 <div>
                   <label className="block text-slate-400 text-sm mb-2">Website</label>
                   <input name="website" type="url" defaultValue={editingLead?.website || ''} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-pink-500/50" placeholder="https://example.com" />
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Lead Type</label>
+                  <select name="lead_type" defaultValue={editingLead?.lead_type || ''} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-pink-500/50">
+                    <option value="">Select type...</option>
+                    <option value="website_design">Website Design</option>
+                    <option value="website_redesign">Website Redesign</option>
+                    <option value="error_fixing">Error Fixing</option>
+                    <option value="maintenance">Maintenance</option>
+                    <option value="consulting">Consulting</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Who Contacted Who?</label>
+                  <select name="contact_method" defaultValue={editingLead?.contact_method || ''} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-pink-500/50">
+                    <option value="">Select...</option>
+                    <option value="they_contacted_me">They contacted me</option>
+                    <option value="i_found_them">I found them</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">How did you find them / How did they find you?</label>
+                  <input name="how_found" type="text" defaultValue={editingLead?.how_found || ''} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-pink-500/50" placeholder="LinkedIn, referral, cold email, etc." />
                 </div>
                 <div>
                   <label className="block text-slate-400 text-sm mb-2">Link to Client</label>
