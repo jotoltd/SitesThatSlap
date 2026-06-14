@@ -3310,7 +3310,7 @@ export default function AdminDashboard() {
                                     </span>
                                     <span className="text-slate-400 capitalize">{interaction.outcome?.replace('_', ' ') || 'Logged'}</span>
                                     <span className="text-slate-600">
-                                      {new Date(interaction.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                                      {new Date(interaction.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                                     </span>
                                   </div>
                                 ))}
