@@ -6,7 +6,7 @@ import { jsPDF } from 'jspdf'
 import { toast } from 'sonner'
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  PieChart, Pie, Cell, LineChart, Line, Area, AreaChart 
+  PieChart, Pie, Cell, LineChart, Line
 } from 'recharts'
 import { 
   Users, FileText, Plus, LogOut, DollarSign, TrendingUp,
@@ -193,6 +193,8 @@ export default function AdminDashboard() {
   const [leadFilterType, setLeadFilterType] = useState<string>('all')
   const [expandedInteractions, setExpandedInteractions] = useState<Set<string>>(new Set())
   const [leadViewMode, setLeadViewMode] = useState<'list' | 'kanban'>('list')
+  const [reportPeriod, setReportPeriod] = useState<'monthly' | 'quarterly' | 'yearly'>('monthly')
+  const [reportYear, setReportYear] = useState(new Date().getFullYear())
   const [loading, setLoading] = useState(true)
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
   const [showProjectModal, setShowProjectModal] = useState(false)
@@ -377,16 +379,54 @@ export default function AdminDashboard() {
       conversion_probability: formData.get('conversion_probability') ? Number(formData.get('conversion_probability')) : null,
       client_id: formData.get('client_id') as string || null,
     }
+    
+    let leadId = editingLead?.id
+    let isConverting = payload.status === 'converted' && editingLead?.status !== 'converted'
+    
     if (editingLead) {
       await supabase.from('leads').update(payload).eq('id', editingLead.id)
       toast.success('Lead updated')
     } else {
-      await supabase.from('leads').insert(payload)
+      const { data } = await supabase.from('leads').insert(payload).select().single()
+      leadId = data?.id
+      isConverting = payload.status === 'converted'
       toast.success('Lead created')
     }
+    
+    // Auto-create client and project when lead is converted
+    if (isConverting && leadId) {
+      let clientId = payload.client_id
+      
+      // Create client if not already linked
+      if (!clientId && payload.email) {
+        const { data: newClient } = await supabase.from('profiles').insert({
+          name: payload.name,
+          email: payload.email,
+          role: 'client'
+        }).select().single()
+        clientId = newClient?.id
+        
+        // Update lead with client_id
+        await supabase.from('leads').update({ client_id: clientId }).eq('id', leadId)
+      }
+      
+      // Create project
+      if (clientId) {
+        await supabase.from('projects').insert({
+          name: payload.company || `${payload.name}'s Project`,
+          description: `Converted from lead: ${payload.notes || 'No notes'}`,
+          client_id: clientId,
+          status: 'in_progress',
+          lead_id: leadId
+        })
+        toast.success('Client and project created from lead')
+      }
+    }
+    
     setShowLeadModal(false)
     setEditingLead(null)
     fetchLeads()
+    fetchData()
   }
 
   const handleDeleteLead = async (id: string) => {
@@ -430,10 +470,45 @@ export default function AdminDashboard() {
       await supabase.from('lead_interactions').insert(payload)
       toast.success(`${interactionType === 'call' ? 'Call' : 'Email'} logged`)
     }
+    
+    // Auto-update lead score based on interactions
+    await autoUpdateLeadScore(interactionLead.id)
+    
     setShowInteractionModal(false)
     setInteractionLead(null)
     setEditingInteraction(null)
     fetchLeads()
+  }
+
+  const autoUpdateLeadScore = async (leadId: string) => {
+    const { data: interactions } = await supabase
+      .from('lead_interactions')
+      .select('*')
+      .eq('lead_id', leadId)
+    
+    if (!interactions || interactions.length === 0) return
+    
+    let score = 1 // Base score
+    
+    interactions.forEach((interaction: any) => {
+      // Positive outcomes increase score
+      if (interaction.outcome === 'interested') score += 1
+      if (interaction.outcome === 'answered') score += 0.5
+      if (interaction.outcome === 'replied') score += 0.5
+      
+      // Negative outcomes decrease score
+      if (interaction.outcome === 'not_interested') score -= 1
+      if (interaction.outcome === 'no_answer') score -= 0.2
+      if (interaction.outcome === 'no_reply') score -= 0.2
+      
+      // Follow-up indicates engagement
+      if (interaction.outcome === 'follow_up') score += 0.3
+    })
+    
+    // Cap score between 1 and 5
+    score = Math.max(1, Math.min(5, Math.round(score * 10) / 10))
+    
+    await supabase.from('leads').update({ lead_score: score }).eq('id', leadId)
   }
 
   const handleDeleteInteraction = async (interactionId: string) => {
@@ -1989,29 +2064,93 @@ export default function AdminDashboard() {
               {/* Revenue Over Time + Client Growth */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="glass-neon rounded-2xl p-6">
-                  <h2 className="text-lg font-bold text-white mb-4">Revenue Over Time</h2>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-bold text-white">Revenue Report</h2>
+                    <div className="flex gap-2">
+                      <select
+                        value={reportPeriod}
+                        onChange={(e) => setReportPeriod(e.target.value as any)}
+                        className="px-3 py-1 rounded-lg bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-pink-500/50"
+                      >
+                        <option value="monthly">Monthly</option>
+                        <option value="quarterly">Quarterly</option>
+                        <option value="yearly">Yearly</option>
+                      </select>
+                      <select
+                        value={reportYear}
+                        onChange={(e) => setReportYear(Number(e.target.value))}
+                        className="px-3 py-1 rounded-lg bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-pink-500/50"
+                      >
+                        {[2024, 2025, 2026, 2027].map(year => (
+                          <option key={year} value={year}>{year}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                   <ResponsiveContainer width="100%" height={200}>
-                    <AreaChart data={(() => {
-                      const months: Record<string, number> = {}
-                      invoices.filter((i: Invoice) => i.status === 'paid').forEach((inv: Invoice) => {
-                        const key = new Date(inv.date).toLocaleDateString('en-GB', { month: 'short', year: '2-digit' })
-                        months[key] = (months[key] || 0) + inv.amount
-                      })
-                      return Object.entries(months).slice(-6).map(([month, revenue]) => ({ month, revenue }))
+                    <BarChart data={(() => {
+                      const paidInvoices = invoices.filter((i: Invoice) => i.status === 'paid' && new Date(i.date).getFullYear() === reportYear)
+                      const data: Record<string, number> = {}
+                      
+                      if (reportPeriod === 'monthly') {
+                        for (let i = 0; i < 12; i++) {
+                          const month = new Date(reportYear, i).toLocaleDateString('en-GB', { month: 'short' })
+                          data[month] = 0
+                        }
+                        paidInvoices.forEach((inv: Invoice) => {
+                          const month = new Date(inv.date).toLocaleDateString('en-GB', { month: 'short' })
+                          data[month] = (data[month] || 0) + inv.amount
+                        })
+                      } else if (reportPeriod === 'quarterly') {
+                        data['Q1'] = 0
+                        data['Q2'] = 0
+                        data['Q3'] = 0
+                        data['Q4'] = 0
+                        paidInvoices.forEach((inv: Invoice) => {
+                          const month = new Date(inv.date).getMonth()
+                          const quarter = `Q${Math.floor(month / 3) + 1}`
+                          data[quarter] = (data[quarter] || 0) + inv.amount
+                        })
+                      } else {
+                        data[reportYear.toString()] = paidInvoices.reduce((sum, inv) => sum + inv.amount, 0)
+                      }
+                      
+                      return Object.entries(data).map(([name, value]) => ({ name, value }))
                     })()}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                      <XAxis dataKey="month" stroke="#94A3B8" fontSize={12} />
-                      <YAxis stroke="#94A3B8" fontSize={12} tickFormatter={(v) => `£${v}`} />
-                      <Tooltip contentStyle={{ backgroundColor: '#1a1a2e', border: 'none', borderRadius: '8px', color: '#fff' }} formatter={(v: any) => [`£${Number(v).toLocaleString()}`, 'Revenue']} />
-                      <defs>
-                        <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#10B981" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <Area type="monotone" dataKey="revenue" stroke="#10B981" strokeWidth={2} fill="url(#revenueGrad)" />
-                    </AreaChart>
+                      <XAxis dataKey="name" stroke="#94A3B8" fontSize={12} />
+                      <YAxis stroke="#94A3B8" fontSize={12} />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#1a1a2e', border: 'none', borderRadius: '8px', color: '#fff' }}
+                        formatter={(value: any) => typeof value === 'number' ? `£${value.toLocaleString()}` : '£0'}
+                      />
+                      <Bar dataKey="value" fill="#EC4899" radius={[4, 4, 0, 0]} />
+                    </BarChart>
                   </ResponsiveContainer>
+                  <div className="mt-4 grid grid-cols-3 gap-4">
+                    <div className="text-center">
+                      <p className="text-slate-400 text-xs">Total Revenue</p>
+                      <p className="text-xl font-bold text-white">
+                        £{invoices.filter((i: Invoice) => i.status === 'paid' && new Date(i.date).getFullYear() === reportYear)
+                          .reduce((sum, i) => sum + i.amount, 0).toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-slate-400 text-xs">Avg Invoice</p>
+                      <p className="text-xl font-bold text-white">
+                        £{(() => {
+                          const paid = invoices.filter((i: Invoice) => i.status === 'paid' && new Date(i.date).getFullYear() === reportYear)
+                          return paid.length ? Math.round(paid.reduce((sum, i) => sum + i.amount, 0) / paid.length).toLocaleString() : 0
+                        })()}
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-slate-400 text-xs">Paid Invoices</p>
+                      <p className="text-xl font-bold text-white">
+                        {invoices.filter((i: Invoice) => i.status === 'paid' && new Date(i.date).getFullYear() === reportYear).length}
+                      </p>
+                    </div>
+                  </div>
                 </motion.div>
 
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} className="glass-neon rounded-2xl p-6">
