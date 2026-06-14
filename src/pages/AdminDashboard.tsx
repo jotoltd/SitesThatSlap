@@ -2061,6 +2061,83 @@ export default function AdminDashboard() {
                 </motion.div>
               </div>
 
+              {/* Client Profitability */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.55 }}
+                className="glass-neon rounded-2xl p-6"
+              >
+                <h2 className="text-lg font-bold text-white mb-4">Top Clients by Revenue</h2>
+                <div className="space-y-3">
+                  {(() => {
+                    const clientRevenue: Record<string, { name: string; revenue: number; invoiceCount: number }> = {}
+                    invoices.filter((i: Invoice) => i.status === 'paid').forEach((inv: Invoice) => {
+                      const clientName = inv.client?.name || 'Unknown'
+                      if (!clientRevenue[clientName]) {
+                        clientRevenue[clientName] = { name: clientName, revenue: 0, invoiceCount: 0 }
+                      }
+                      clientRevenue[clientName].revenue += inv.amount
+                      clientRevenue[clientName].invoiceCount++
+                    })
+                    return Object.values(clientRevenue)
+                      .sort((a, b) => b.revenue - a.revenue)
+                      .slice(0, 5)
+                      .map((client, i) => (
+                        <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-white/5">
+                          <div>
+                            <p className="text-white font-semibold">{client.name}</p>
+                            <p className="text-slate-400 text-xs">{client.invoiceCount} invoices</p>
+                          </div>
+                          <p className="text-xl font-bold text-green-400">£{client.revenue.toLocaleString()}</p>
+                        </div>
+                      ))
+                  })()}
+                </div>
+              </motion.div>
+
+              {/* Sales Funnel */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.6 }}
+                className="glass-neon rounded-2xl p-6"
+              >
+                <h2 className="text-lg font-bold text-white mb-4">Sales Funnel</h2>
+                <div className="space-y-4">
+                  {[
+                    { stage: 'Leads', count: leads.length, color: '#3B82F6' },
+                    { stage: 'Contacted', count: leads.filter((l: Lead) => l.status === 'contacted').length, color: '#F59E0B' },
+                    { stage: 'Qualified', count: leads.filter((l: Lead) => l.status === 'qualified').length, color: '#10B981' },
+                    { stage: 'Converted', count: leads.filter((l: Lead) => l.status === 'converted').length, color: '#8B5CF6' },
+                  ].map((stage, i) => (
+                    <div key={i}>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-slate-400">{stage.stage}</span>
+                        <span className="text-white font-semibold">{stage.count}</span>
+                      </div>
+                      <div className="h-3 bg-white/5 rounded-full overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${leads.length ? (stage.count / leads.length) * 100 : 0}%` }}
+                          transition={{ delay: 0.7 + i * 0.1 }}
+                          className="h-full rounded-full"
+                          style={{ backgroundColor: stage.color }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  <div className="pt-4 border-t border-white/10 mt-4">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400 text-sm">Conversion Rate</span>
+                      <span className="text-green-400 font-bold">
+                        {leads.length ? Math.round((leads.filter((l: Lead) => l.status === 'converted').length / leads.length) * 100) : 0}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+
               {/* Revenue Over Time + Client Growth */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="glass-neon rounded-2xl p-6">
