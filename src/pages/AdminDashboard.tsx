@@ -13,7 +13,7 @@ import {
   CheckCircle, XCircle, Clock, Send, Trash2, Edit2,
   Search, Filter, Download, Menu, X, Loader2, MessageSquare, Upload,
   CalendarDays, LayoutGrid, Github, Settings, Activity,
-  KeyRound, Eye, EyeOff, Copy, Paperclip, FileIcon, Target, RefreshCw, Pause, Play
+  KeyRound, Eye, EyeOff, Copy, Paperclip, FileIcon, Target, RefreshCw, Pause, Play, Phone, Mail
 } from 'lucide-react'
 import { NotificationBell } from '../components/Notifications'
 import SettingsModal from '../components/SettingsModal'
@@ -84,6 +84,16 @@ interface Lead {
   created_at: string
   updated_at: string
   client?: Client
+  interactions?: LeadInteraction[]
+}
+
+interface LeadInteraction {
+  id: string
+  lead_id: string
+  type: 'call' | 'email'
+  outcome?: 'answered' | 'no_answer' | 'voicemail' | 'replied' | 'no_reply' | 'interested' | 'not_interested' | 'follow_up'
+  notes?: string
+  created_at: string
 }
 
 interface ProjectSummary {
@@ -168,6 +178,9 @@ export default function AdminDashboard() {
   const [leadsLoading, setLeadsLoading] = useState(false)
   const [editingLead, setEditingLead] = useState<Lead | null>(null)
   const [showLeadModal, setShowLeadModal] = useState(false)
+  const [showInteractionModal, setShowInteractionModal] = useState(false)
+  const [interactionLead, setInteractionLead] = useState<Lead | null>(null)
+  const [interactionType, setInteractionType] = useState<'call' | 'email'>('call')
   const [loading, setLoading] = useState(true)
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
   const [showProjectModal, setShowProjectModal] = useState(false)
@@ -327,7 +340,7 @@ export default function AdminDashboard() {
     setLeadsLoading(true)
     const { data } = await supabase
       .from('leads')
-      .select('*, client:profiles(name, email)')
+      .select('*, client:profiles(name, email), interactions:lead_interactions(*)')
       .order('created_at', { ascending: false })
     setLeads(data || [])
     setLeadsLoading(false)
@@ -383,6 +396,21 @@ export default function AdminDashboard() {
       const { data: projectsData } = await supabase.from('projects').select('*, client:profiles(name, email)').order('created_at', { ascending: false })
       setProjects(projectsData || [])
     }
+  }
+
+  const handleSaveInteraction = async (formData: FormData) => {
+    if (!interactionLead) return
+    const payload = {
+      lead_id: interactionLead.id,
+      type: interactionType,
+      outcome: formData.get('outcome') as string || null,
+      notes: formData.get('notes') as string || null,
+    }
+    await supabase.from('lead_interactions').insert(payload)
+    toast.success(`${interactionType === 'call' ? 'Call' : 'Email'} logged`)
+    setShowInteractionModal(false)
+    setInteractionLead(null)
+    fetchLeads()
   }
 
   const fetchData = async () => {
@@ -3272,11 +3300,41 @@ export default function AdminDashboard() {
                             {lead.contact_method && <p className="text-xs text-purple-400 mt-1">{lead.contact_method === 'they_contacted_me' ? '📥 They contacted me' : '📤 I found them'}</p>}
                             {lead.how_found && <p className="text-xs text-slate-500 mt-1">{lead.how_found}</p>}
                             {lead.source && <p className="text-xs text-slate-500 mt-1">Source: {lead.source}</p>}
+                            {lead.interactions && lead.interactions.length > 0 && (
+                              <div className="mt-3 pt-3 border-t border-white/10">
+                                <p className="text-xs text-slate-500 font-bold mb-2">Recent Interactions</p>
+                                {lead.interactions.slice(0, 3).map((interaction) => (
+                                  <div key={interaction.id} className="flex items-center gap-2 text-xs mb-1">
+                                    <span className={interaction.type === 'call' ? 'text-green-400' : 'text-blue-400'}>
+                                      {interaction.type === 'call' ? '📞' : '✉️'}
+                                    </span>
+                                    <span className="text-slate-400 capitalize">{interaction.outcome?.replace('_', ' ') || 'Logged'}</span>
+                                    <span className="text-slate-600">
+                                      {new Date(interaction.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                             {lead.notes && <p className="text-slate-400 text-sm mt-2 line-clamp-2">{lead.notes}</p>}
                             {lead.client && <p className="text-xs text-green-400 mt-1">Linked to: {lead.client.name}</p>}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => { setInteractionLead(lead); setInteractionType('call'); setShowInteractionModal(true) }}
+                            className="px-3 py-2 rounded-lg bg-green-500/20 text-green-400 text-sm font-bold hover:bg-green-500/30 flex items-center gap-1"
+                            title="Log call"
+                          >
+                            <Phone className="w-4 h-4" /> Call
+                          </button>
+                          <button
+                            onClick={() => { setInteractionLead(lead); setInteractionType('email'); setShowInteractionModal(true) }}
+                            className="px-3 py-2 rounded-lg bg-blue-500/20 text-blue-400 text-sm font-bold hover:bg-blue-500/30 flex items-center gap-1"
+                            title="Log email"
+                          >
+                            <Mail className="w-4 h-4" /> Email
+                          </button>
                           {lead.status !== 'converted' && (
                             <button
                               onClick={() => handleConvertToProject(lead)}
@@ -3462,6 +3520,61 @@ export default function AdminDashboard() {
                   <button type="button" onClick={() => { setShowLeadModal(false); setEditingLead(null) }} className="flex-1 px-4 py-3 rounded-xl bg-white/5 text-white font-bold hover:bg-white/10">Cancel</button>
                   <button type="submit" className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold">
                     {editingLead ? 'Save Changes' : 'Add Lead'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Interaction Logging Modal */}
+      <AnimatePresence>
+        {showInteractionModal && interactionLead && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+            onClick={() => { setShowInteractionModal(false); setInteractionLead(null) }}>
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              className="glass-neon rounded-2xl p-6 w-full max-w-lg"
+              onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-xl font-black text-white">Log {interactionType === 'call' ? 'Call' : 'Email'}</h2>
+                <button onClick={() => { setShowInteractionModal(false); setInteractionLead(null) }} className="p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+              </div>
+              <p className="text-slate-400 text-sm mb-4">Logging interaction for <span className="text-white font-bold">{interactionLead.name}</span></p>
+              <form onSubmit={(e) => { e.preventDefault(); handleSaveInteraction(new FormData(e.target as HTMLFormElement)) }} className="space-y-4">
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Outcome</label>
+                  <select name="outcome" className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-pink-500/50">
+                    <option value="">Select outcome...</option>
+                    {interactionType === 'call' ? (
+                      <>
+                        <option value="answered">Answered</option>
+                        <option value="no_answer">No Answer</option>
+                        <option value="voicemail">Voicemail</option>
+                        <option value="interested">Interested</option>
+                        <option value="not_interested">Not Interested</option>
+                        <option value="follow_up">Follow Up</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="replied">Replied</option>
+                        <option value="no_reply">No Reply</option>
+                        <option value="interested">Interested</option>
+                        <option value="not_interested">Not Interested</option>
+                        <option value="follow_up">Follow Up</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Notes</label>
+                  <textarea name="notes" rows={4} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white resize-none focus:outline-none focus:border-pink-500/50" placeholder="Details about the interaction..." />
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button type="button" onClick={() => { setShowInteractionModal(false); setInteractionLead(null) }} className="flex-1 px-4 py-3 rounded-xl bg-white/5 text-white font-bold hover:bg-white/10">Cancel</button>
+                  <button type="submit" className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold">
+                    Log {interactionType === 'call' ? 'Call' : 'Email'}
                   </button>
                 </div>
               </form>
