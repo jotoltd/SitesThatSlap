@@ -13,7 +13,7 @@ import {
   CheckCircle, XCircle, Clock, Send, Trash2, Edit2,
   Search, Filter, Download, Menu, X, Loader2, MessageSquare, Upload,
   CalendarDays, LayoutGrid, Github, Settings, Activity,
-  KeyRound, Eye, EyeOff, Copy, Paperclip, FileIcon, Target, RefreshCw, Pause, Play, Phone, Mail
+  KeyRound, Eye, EyeOff, Copy, Paperclip, FileIcon, Target, RefreshCw, Pause, Play, Phone, Mail, List
 } from 'lucide-react'
 import { NotificationBell } from '../components/Notifications'
 import SettingsModal from '../components/SettingsModal'
@@ -79,11 +79,17 @@ interface Lead {
   lead_type?: 'website_design' | 'website_redesign' | 'error_fixing' | 'maintenance' | 'consulting' | 'other'
   contact_method?: 'they_contacted_me' | 'i_found_them'
   how_found?: string
+  estimated_value?: number
+  follow_up_date?: string
+  lead_score?: number
+  assigned_to?: string
+  conversion_probability?: number
   client_id?: string
   converted_to_project_id?: string
   created_at: string
   updated_at: string
   client?: Client
+  assigned_user?: Client
   interactions?: LeadInteraction[]
 }
 
@@ -181,6 +187,12 @@ export default function AdminDashboard() {
   const [showInteractionModal, setShowInteractionModal] = useState(false)
   const [interactionLead, setInteractionLead] = useState<Lead | null>(null)
   const [interactionType, setInteractionType] = useState<'call' | 'email'>('call')
+  const [editingInteraction, setEditingInteraction] = useState<LeadInteraction | null>(null)
+  const [leadSearchTerm, setLeadSearchTerm] = useState('')
+  const [leadFilterStatus, setLeadFilterStatus] = useState<string>('all')
+  const [leadFilterType, setLeadFilterType] = useState<string>('all')
+  const [expandedInteractions, setExpandedInteractions] = useState<Set<string>>(new Set())
+  const [leadViewMode, setLeadViewMode] = useState<'list' | 'kanban'>('list')
   const [loading, setLoading] = useState(true)
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
   const [showProjectModal, setShowProjectModal] = useState(false)
@@ -340,7 +352,7 @@ export default function AdminDashboard() {
     setLeadsLoading(true)
     const { data } = await supabase
       .from('leads')
-      .select('*, client:profiles(name, email), interactions:lead_interactions(*)')
+      .select('*, client:profiles(name, email), assigned_user:profiles(name, email), interactions:lead_interactions(*)')
       .order('created_at', { ascending: false })
     setLeads(data || [])
     setLeadsLoading(false)
@@ -358,6 +370,11 @@ export default function AdminDashboard() {
       lead_type: formData.get('lead_type') as string || null,
       contact_method: formData.get('contact_method') as string || null,
       how_found: formData.get('how_found') as string || null,
+      estimated_value: formData.get('estimated_value') ? Number(formData.get('estimated_value')) : null,
+      follow_up_date: formData.get('follow_up_date') as string || null,
+      lead_score: formData.get('lead_score') ? Number(formData.get('lead_score')) : null,
+      assigned_to: formData.get('assigned_to') as string || null,
+      conversion_probability: formData.get('conversion_probability') ? Number(formData.get('conversion_probability')) : null,
       client_id: formData.get('client_id') as string || null,
     }
     if (editingLead) {
@@ -406,11 +423,64 @@ export default function AdminDashboard() {
       outcome: formData.get('outcome') as string || null,
       notes: formData.get('notes') as string || null,
     }
-    await supabase.from('lead_interactions').insert(payload)
-    toast.success(`${interactionType === 'call' ? 'Call' : 'Email'} logged`)
+    if (editingInteraction) {
+      await supabase.from('lead_interactions').update(payload).eq('id', editingInteraction.id)
+      toast.success('Interaction updated')
+    } else {
+      await supabase.from('lead_interactions').insert(payload)
+      toast.success(`${interactionType === 'call' ? 'Call' : 'Email'} logged`)
+    }
     setShowInteractionModal(false)
     setInteractionLead(null)
+    setEditingInteraction(null)
     fetchLeads()
+  }
+
+  const handleDeleteInteraction = async (interactionId: string) => {
+    if (!confirm('Delete this interaction?')) return
+    await supabase.from('lead_interactions').delete().eq('id', interactionId)
+    toast.success('Interaction deleted')
+    fetchLeads()
+  }
+
+  const handleExportLeads = () => {
+    const filteredLeads = leads.filter(lead => {
+      const matchesSearch = !leadSearchTerm ||
+        lead.name.toLowerCase().includes(leadSearchTerm.toLowerCase()) ||
+        (lead.company && lead.company.toLowerCase().includes(leadSearchTerm.toLowerCase())) ||
+        (lead.email && lead.email.toLowerCase().includes(leadSearchTerm.toLowerCase()))
+      const matchesStatus = leadFilterStatus === 'all' || lead.status === leadFilterStatus
+      const matchesType = leadFilterType === 'all' || lead.lead_type === leadFilterType
+      return matchesSearch && matchesStatus && matchesType
+    })
+
+    const headers = ['Name', 'Email', 'Company', 'Status', 'Lead Type', 'Contact Method', 'Source', 'Estimated Value', 'Lead Score', 'Conversion Probability', 'Follow-up Date', 'Assigned To', 'Notes', 'Created At']
+    const rows = filteredLeads.map(lead => [
+      lead.name,
+      lead.email || '',
+      lead.company || '',
+      lead.status,
+      lead.lead_type || '',
+      lead.contact_method || '',
+      lead.source || '',
+      lead.estimated_value || '',
+      lead.lead_score || '',
+      lead.conversion_probability || '',
+      lead.follow_up_date || '',
+      lead.assigned_user?.name || '',
+      lead.notes || '',
+      new Date(lead.created_at).toLocaleDateString('en-GB')
+    ])
+
+    const csvContent = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `leads-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success('Leads exported to CSV')
   }
 
   const fetchData = async () => {
@@ -1793,6 +1863,75 @@ export default function AdminDashboard() {
                   </div>
                 </motion.div>
 
+                {/* Lead Source Analytics */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.35 }}
+                  className="glass-neon rounded-2xl p-6"
+                >
+                  <h2 className="text-lg font-bold text-white mb-4">Lead Sources</h2>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <PieChart>
+                      <Pie
+                        data={(() => {
+                          const sourceCounts: Record<string, number> = {}
+                          leads.forEach((lead: Lead) => {
+                            if (lead.source) {
+                              sourceCounts[lead.source] = (sourceCounts[lead.source] || 0) + 1
+                            }
+                          })
+                          const colors = ['#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981', '#6B7280']
+                          return Object.entries(sourceCounts).map(([name, value], i) => ({
+                            name,
+                            value,
+                            color: colors[i % colors.length]
+                          }))
+                        })()}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={80}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {(() => {
+                          const sourceCounts: Record<string, number> = {}
+                          leads.forEach((lead: Lead) => {
+                            if (lead.source) {
+                              sourceCounts[lead.source] = (sourceCounts[lead.source] || 0) + 1
+                            }
+                          })
+                          const colors = ['#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981', '#6B7280']
+                          return Object.entries(sourceCounts).map(([,], i) => (
+                            <Cell key={`cell-${i}`} fill={colors[i % colors.length]} />
+                          ))
+                        })()}
+                      </Pie>
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#1a1a2e', border: 'none', borderRadius: '8px', color: '#fff' }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="flex justify-center gap-4 mt-4 flex-wrap">
+                    {(() => {
+                      const sourceCounts: Record<string, number> = {}
+                      leads.forEach((lead: Lead) => {
+                        if (lead.source) {
+                          sourceCounts[lead.source] = (sourceCounts[lead.source] || 0) + 1
+                        }
+                      })
+                      const colors = ['#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981', '#6B7280']
+                      return Object.entries(sourceCounts).map(([name, value], i) => (
+                        <div key={name} className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: colors[i % colors.length] }} />
+                          <span className="text-sm text-slate-400">{name} ({value})</span>
+                        </div>
+                      ))
+                    })()}
+                  </div>
+                </motion.div>
+
                 {/* Project Status Chart */}
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
@@ -1807,6 +1946,33 @@ export default function AdminDashboard() {
                       { name: 'Review', count: projects.filter((p: Project) => p.status === 'review').length, fill: '#8B5CF6' },
                       { name: 'Completed', count: projects.filter((p: Project) => p.status === 'completed').length, fill: '#10B981' },
                       { name: 'On Hold', count: projects.filter((p: Project) => p.status === 'on_hold').length, fill: '#6B7280' },
+                    ]}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                      <XAxis dataKey="name" stroke="#94A3B8" fontSize={12} />
+                      <YAxis stroke="#94A3B8" fontSize={12} />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#1a1a2e', border: 'none', borderRadius: '8px', color: '#fff' }}
+                      />
+                      <Bar dataKey="count" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </motion.div>
+
+                {/* Lead Status Chart */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.45 }}
+                  className="glass-neon rounded-2xl p-6"
+                >
+                  <h2 className="text-lg font-bold text-white mb-4">Lead Status</h2>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={[
+                      { name: 'New', count: leads.filter((l: Lead) => l.status === 'new').length, fill: '#3B82F6' },
+                      { name: 'Contacted', count: leads.filter((l: Lead) => l.status === 'contacted').length, fill: '#F59E0B' },
+                      { name: 'Qualified', count: leads.filter((l: Lead) => l.status === 'qualified').length, fill: '#10B981' },
+                      { name: 'Lost', count: leads.filter((l: Lead) => l.status === 'lost').length, fill: '#EF4444' },
+                      { name: 'Converted', count: leads.filter((l: Lead) => l.status === 'converted').length, fill: '#8B5CF6' },
                     ]}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#333" />
                       <XAxis dataKey="name" stroke="#94A3B8" fontSize={12} />
@@ -3245,28 +3411,137 @@ export default function AdminDashboard() {
                   <h1 className="text-3xl font-black text-white">Leads</h1>
                   <p className="text-slate-400 mt-1">Track and convert potential clients</p>
                 </div>
-                <button
-                  onClick={() => { setEditingLead(null); setShowLeadModal(true) }}
-                  className="px-6 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold flex items-center gap-2"
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setLeadViewMode(leadViewMode === 'list' ? 'kanban' : 'list')}
+                    className="px-4 py-3 rounded-xl glass-neon text-slate-400 font-bold flex items-center gap-2 hover:text-white"
+                    title="Toggle view"
+                  >
+                    {leadViewMode === 'list' ? <LayoutGrid className="w-4 h-4" /> : <List className="w-4 h-4" />}
+                    {leadViewMode === 'list' ? 'Kanban' : 'List'}
+                  </button>
+                  <button
+                    onClick={handleExportLeads}
+                    className="px-4 py-3 rounded-xl glass-neon text-slate-400 font-bold flex items-center gap-2 hover:text-white"
+                    title="Export to CSV"
+                  >
+                    <Download className="w-4 h-4" /> Export
+                  </button>
+                  <button
+                    onClick={() => { setEditingLead(null); setShowLeadModal(true) }}
+                    className="px-6 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold flex items-center gap-2"
+                  >
+                    <Plus className="w-5 h-5" /> Add Lead
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 flex-wrap">
+                <input
+                  type="text"
+                  value={leadSearchTerm}
+                  onChange={(e) => setLeadSearchTerm(e.target.value)}
+                  placeholder="Search by name, company, email..."
+                  className="flex-1 min-w-[200px] px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-pink-500/50"
+                />
+                <select
+                  value={leadFilterStatus}
+                  onChange={(e) => setLeadFilterStatus(e.target.value)}
+                  className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-pink-500/50"
                 >
-                  <Plus className="w-5 h-5" /> Add Lead
-                </button>
+                  <option value="all">All Statuses</option>
+                  <option value="new">New</option>
+                  <option value="contacted">Contacted</option>
+                  <option value="qualified">Qualified</option>
+                  <option value="lost">Lost</option>
+                  <option value="converted">Converted</option>
+                </select>
+                <select
+                  value={leadFilterType}
+                  onChange={(e) => setLeadFilterType(e.target.value)}
+                  className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-pink-500/50"
+                >
+                  <option value="all">All Types</option>
+                  <option value="website_design">Website Design</option>
+                  <option value="website_redesign">Website Redesign</option>
+                  <option value="error_fixing">Error Fixing</option>
+                  <option value="maintenance">Maintenance</option>
+                  <option value="consulting">Consulting</option>
+                  <option value="other">Other</option>
+                </select>
               </div>
 
               {leadsLoading ? (
                 <div className="text-center py-12"><Loader2 className="w-8 h-8 text-pink-500 animate-spin mx-auto" /></div>
-              ) : leads.length === 0 ? (
+              ) : leadViewMode === 'kanban' ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {['new', 'contacted', 'qualified', 'converted'].map((status) => {
+                    const statusLeads = leads.filter(lead => {
+                      const matchesSearch = !leadSearchTerm ||
+                        lead.name.toLowerCase().includes(leadSearchTerm.toLowerCase()) ||
+                        (lead.company && lead.company.toLowerCase().includes(leadSearchTerm.toLowerCase())) ||
+                        (lead.email && lead.email.toLowerCase().includes(leadSearchTerm.toLowerCase()))
+                      const matchesStatus = lead.status === status
+                      const matchesType = leadFilterType === 'all' || lead.lead_type === leadFilterType
+                      return matchesSearch && matchesStatus && matchesType
+                    })
+                    return (
+                      <div key={status} className="glass-neon rounded-2xl p-4">
+                        <div className="flex items-center gap-2 mb-4">
+                          <div className={`w-3 h-3 rounded-full ${
+                            status === 'new' ? 'bg-blue-400' :
+                            status === 'contacted' ? 'bg-yellow-400' :
+                            status === 'qualified' ? 'bg-green-400' : 'bg-purple-400'
+                          }`} />
+                          <h3 className="font-bold text-white capitalize">{status} ({statusLeads.length})</h3>
+                        </div>
+                        <div className="space-y-3">
+                          {statusLeads.map((lead) => (
+                            <motion.div key={lead.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white/5 rounded-xl p-3 border border-white/10">
+                              <div className="flex items-center justify-between mb-2">
+                                <h4 className="font-bold text-white text-sm">{lead.name}</h4>
+                                {lead.lead_score && <span className="text-xs text-yellow-400">{lead.lead_score}/5</span>}
+                              </div>
+                              {lead.company && <p className="text-xs text-slate-400">{lead.company}</p>}
+                              {lead.estimated_value && <p className="text-xs text-green-400 mt-1">£{lead.estimated_value.toLocaleString()}</p>}
+                              <div className="flex gap-1 mt-2">
+                                <button onClick={() => { setInteractionLead(lead); setInteractionType('call'); setShowInteractionModal(true) }} className="p-1 rounded bg-green-500/20 text-green-400 text-xs hover:bg-green-500/30">📞</button>
+                                <button onClick={() => { setInteractionLead(lead); setInteractionType('email'); setShowInteractionModal(true) }} className="p-1 rounded bg-blue-500/20 text-blue-400 text-xs hover:bg-blue-500/30">✉️</button>
+                                <button onClick={() => { setEditingLead(lead); setShowLeadModal(true) }} className="p-1 rounded bg-white/10 text-slate-400 text-xs hover:bg-white/20">✏️</button>
+                              </div>
+                            </motion.div>
+                          ))}
+                          {statusLeads.length === 0 && <p className="text-xs text-slate-500 text-center py-4">No leads</p>}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : leads.filter(lead => {
+                const matchesSearch = !leadSearchTerm || 
+                  lead.name.toLowerCase().includes(leadSearchTerm.toLowerCase()) ||
+                  (lead.company && lead.company.toLowerCase().includes(leadSearchTerm.toLowerCase())) ||
+                  (lead.email && lead.email.toLowerCase().includes(leadSearchTerm.toLowerCase()))
+                const matchesStatus = leadFilterStatus === 'all' || lead.status === leadFilterStatus
+                const matchesType = leadFilterType === 'all' || lead.lead_type === leadFilterType
+                return matchesSearch && matchesStatus && matchesType
+              }).length === 0 ? (
                 <div className="glass-neon rounded-2xl p-12 text-center">
                   <Target className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-                  <p className="text-slate-400 text-lg font-semibold">No leads yet</p>
-                  <p className="text-slate-500 text-sm mt-2">Add potential clients to track and convert</p>
-                  <button onClick={() => { setEditingLead(null); setShowLeadModal(true) }} className="mt-6 px-6 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold">
-                    Add First Lead
-                  </button>
+                  <p className="text-slate-400 text-lg font-semibold">No leads match your filters</p>
+                  <p className="text-slate-500 text-sm mt-2">Try adjusting your search or filters</p>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {leads.map((lead) => (
+                  {leads.filter(lead => {
+                    const matchesSearch = !leadSearchTerm || 
+                      lead.name.toLowerCase().includes(leadSearchTerm.toLowerCase()) ||
+                      (lead.company && lead.company.toLowerCase().includes(leadSearchTerm.toLowerCase())) ||
+                      (lead.email && lead.email.toLowerCase().includes(leadSearchTerm.toLowerCase()))
+                    const matchesStatus = leadFilterStatus === 'all' || lead.status === leadFilterStatus
+                    const matchesType = leadFilterType === 'all' || lead.lead_type === leadFilterType
+                    return matchesSearch && matchesStatus && matchesType
+                  }).map((lead) => (
                     <motion.div key={lead.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-neon rounded-2xl p-5">
                       <div className="flex items-start justify-between gap-4 flex-wrap">
                         <div className="flex items-center gap-4">
@@ -3300,11 +3575,41 @@ export default function AdminDashboard() {
                             {lead.contact_method && <p className="text-xs text-purple-400 mt-1">{lead.contact_method === 'they_contacted_me' ? '📥 They contacted me' : '📤 I found them'}</p>}
                             {lead.how_found && <p className="text-xs text-slate-500 mt-1">{lead.how_found}</p>}
                             {lead.source && <p className="text-xs text-slate-500 mt-1">Source: {lead.source}</p>}
+                            <div className="flex items-center gap-3 mt-2 text-xs">
+                              {lead.estimated_value && <span className="text-green-400">£{lead.estimated_value.toLocaleString()}</span>}
+                              {lead.lead_score && <span className="text-yellow-400">Score: {lead.lead_score}/5</span>}
+                              {lead.conversion_probability && <span className="text-blue-400">{lead.conversion_probability}%</span>}
+                            </div>
+                            {lead.follow_up_date && (
+                              <p className={`text-xs mt-1 ${new Date(lead.follow_up_date) < new Date() && lead.status !== 'converted' ? 'text-red-400 font-bold' : 'text-slate-500'}`}>
+                                Follow-up: {new Date(lead.follow_up_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                                {new Date(lead.follow_up_date) < new Date() && lead.status !== 'converted' && ' ⚠️ Overdue'}
+                              </p>
+                            )}
+                            {lead.assigned_user && <p className="text-xs text-slate-500 mt-1">Assigned to: {lead.assigned_user.name}</p>}
                             {lead.interactions && lead.interactions.length > 0 && (
                               <div className="mt-3 pt-3 border-t border-white/10">
-                                <p className="text-xs text-slate-500 font-bold mb-2">Recent Interactions</p>
-                                {lead.interactions.slice(0, 3).map((interaction) => (
-                                  <div key={interaction.id} className="flex items-center gap-2 text-xs mb-1">
+                                <div className="flex items-center justify-between mb-2">
+                                  <p className="text-xs text-slate-500 font-bold">Interactions ({lead.interactions.length})</p>
+                                  {lead.interactions.length > 3 && (
+                                    <button
+                                      onClick={() => {
+                                        const newExpanded = new Set(expandedInteractions)
+                                        if (newExpanded.has(lead.id)) {
+                                          newExpanded.delete(lead.id)
+                                        } else {
+                                          newExpanded.add(lead.id)
+                                        }
+                                        setExpandedInteractions(newExpanded)
+                                      }}
+                                      className="text-xs text-pink-400 hover:text-pink-300"
+                                    >
+                                      {expandedInteractions.has(lead.id) ? 'Show less' : 'Show all'}
+                                    </button>
+                                  )}
+                                </div>
+                                {(expandedInteractions.has(lead.id) ? lead.interactions : lead.interactions.slice(0, 3)).map((interaction) => (
+                                  <div key={interaction.id} className="flex items-center gap-2 text-xs mb-1 group">
                                     <span className={interaction.type === 'call' ? 'text-green-400' : 'text-blue-400'}>
                                       {interaction.type === 'call' ? '📞' : '✉️'}
                                     </span>
@@ -3312,6 +3617,23 @@ export default function AdminDashboard() {
                                     <span className="text-slate-600">
                                       {new Date(interaction.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                                     </span>
+                                    {interaction.notes && <span className="text-slate-500 truncate max-w-[150px]">- {interaction.notes}</span>}
+                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-auto">
+                                      <button
+                                        onClick={() => { setEditingInteraction(interaction); setInteractionType(interaction.type); setInteractionLead(lead); setShowInteractionModal(true) }}
+                                        className="p-1 rounded hover:bg-white/10 text-slate-500 hover:text-white"
+                                        title="Edit"
+                                      >
+                                        <Edit2 className="w-3 h-3" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeleteInteraction(interaction.id)}
+                                        className="p-1 rounded hover:bg-white/10 text-slate-500 hover:text-red-400"
+                                        title="Delete"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </button>
+                                    </div>
                                   </div>
                                 ))}
                               </div>
@@ -3512,6 +3834,42 @@ export default function AdminDashboard() {
                     ))}
                   </select>
                 </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-slate-400 text-sm mb-2">Estimated Value (£)</label>
+                    <input name="estimated_value" type="number" step="0.01" defaultValue={editingLead?.estimated_value || ''} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-pink-500/50" placeholder="5000" />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 text-sm mb-2">Lead Score (1-5)</label>
+                    <select name="lead_score" defaultValue={editingLead?.lead_score || ''} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-pink-500/50">
+                      <option value="">Select...</option>
+                      <option value="1">1 - Low</option>
+                      <option value="2">2 - Fair</option>
+                      <option value="3">3 - Average</option>
+                      <option value="4">4 - Good</option>
+                      <option value="5">5 - Excellent</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-slate-400 text-sm mb-2">Follow-up Date</label>
+                    <input name="follow_up_date" type="date" defaultValue={editingLead?.follow_up_date || ''} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-pink-500/50" />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 text-sm mb-2">Conversion Probability (%)</label>
+                    <input name="conversion_probability" type="number" min="0" max="100" defaultValue={editingLead?.conversion_probability || ''} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-pink-500/50" placeholder="50" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Assign To</label>
+                  <select name="assigned_to" defaultValue={editingLead?.assigned_to || ''} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-pink-500/50">
+                    <option value="">Unassigned</option>
+                    {clients.map((c: Client) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
                 <div>
                   <label className="block text-slate-400 text-sm mb-2">Notes</label>
                   <textarea name="notes" rows={3} defaultValue={editingLead?.notes || ''} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white resize-none focus:outline-none focus:border-pink-500/50" placeholder="Any additional notes..." />
@@ -3533,19 +3891,19 @@ export default function AdminDashboard() {
         {showInteractionModal && interactionLead && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
-            onClick={() => { setShowInteractionModal(false); setInteractionLead(null) }}>
+            onClick={() => { setShowInteractionModal(false); setInteractionLead(null); setEditingInteraction(null) }}>
             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
               className="glass-neon rounded-2xl p-6 w-full max-w-lg"
               onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-5">
-                <h2 className="text-xl font-black text-white">Log {interactionType === 'call' ? 'Call' : 'Email'}</h2>
-                <button onClick={() => { setShowInteractionModal(false); setInteractionLead(null) }} className="p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+                <h2 className="text-xl font-black text-white">{editingInteraction ? 'Edit' : 'Log'} {interactionType === 'call' ? 'Call' : 'Email'}</h2>
+                <button onClick={() => { setShowInteractionModal(false); setInteractionLead(null); setEditingInteraction(null) }} className="p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
               </div>
-              <p className="text-slate-400 text-sm mb-4">Logging interaction for <span className="text-white font-bold">{interactionLead.name}</span></p>
+              <p className="text-slate-400 text-sm mb-4">{editingInteraction ? 'Editing interaction for' : 'Logging interaction for'} <span className="text-white font-bold">{interactionLead.name}</span></p>
               <form onSubmit={(e) => { e.preventDefault(); handleSaveInteraction(new FormData(e.target as HTMLFormElement)) }} className="space-y-4">
                 <div>
                   <label className="block text-slate-400 text-sm mb-2">Outcome</label>
-                  <select name="outcome" className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-pink-500/50">
+                  <select name="outcome" defaultValue={editingInteraction?.outcome || ''} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-pink-500/50">
                     <option value="">Select outcome...</option>
                     {interactionType === 'call' ? (
                       <>
@@ -3569,12 +3927,12 @@ export default function AdminDashboard() {
                 </div>
                 <div>
                   <label className="block text-slate-400 text-sm mb-2">Notes</label>
-                  <textarea name="notes" rows={4} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white resize-none focus:outline-none focus:border-pink-500/50" placeholder="Details about the interaction..." />
+                  <textarea name="notes" rows={4} defaultValue={editingInteraction?.notes || ''} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white resize-none focus:outline-none focus:border-pink-500/50" placeholder="Details about the interaction..." />
                 </div>
                 <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={() => { setShowInteractionModal(false); setInteractionLead(null) }} className="flex-1 px-4 py-3 rounded-xl bg-white/5 text-white font-bold hover:bg-white/10">Cancel</button>
+                  <button type="button" onClick={() => { setShowInteractionModal(false); setInteractionLead(null); setEditingInteraction(null) }} className="flex-1 px-4 py-3 rounded-xl bg-white/5 text-white font-bold hover:bg-white/10">Cancel</button>
                   <button type="submit" className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold">
-                    Log {interactionType === 'call' ? 'Call' : 'Email'}
+                    {editingInteraction ? 'Save Changes' : `Log ${interactionType === 'call' ? 'Call' : 'Email'}`}
                   </button>
                 </div>
               </form>
